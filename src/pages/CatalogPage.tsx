@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import furyIcon     from '../assets/icons/Fury.png'
+import calmIcon     from '../assets/icons/Calm.png'
+import mindIcon     from '../assets/icons/Mind.png'
+import bodyIcon     from '../assets/icons/Body.png'
+import chaosIcon    from '../assets/icons/Chaos.png'
+import orderIcon    from '../assets/icons/Order.png'
+
+import commonIcon   from '../assets/icons/Common.png'
+import uncommonIcon from '../assets/icons/Uncommon.png'
+import rareIcon     from '../assets/icons/Rare.png'
+import epicIcon     from '../assets/icons/Epic.png'
+import showcaseIcon from '../assets/icons/Showcase.png'
+
 interface Card {
   product_id: number
   name: string
@@ -26,7 +39,14 @@ const SETS = [
   { value: 'spiritforged',            label: 'Spiritforged'   },
   { value: 'unleashed',               label: 'Unleashed'      },
 ]
-const RARITIES   = ['Common', 'Uncommon', 'Rare', 'Epic', 'Showcase', 'Signed Showcase']
+const RARITIES = [
+  { value: 'Common',          label: 'Common',          icon: commonIcon   },
+  { value: 'Uncommon',        label: 'Uncommon',        icon: uncommonIcon },
+  { value: 'Rare',            label: 'Rare',            icon: rareIcon     },
+  { value: 'Epic',            label: 'Epic',            icon: epicIcon     },
+  { value: 'Showcase',        label: 'Showcase',        icon: showcaseIcon },
+  { value: 'Signed Showcase', label: 'Signed Showcase', icon: showcaseIcon },
+]
 const CARD_TYPES = ['Unit', 'Spell', 'Gear', 'Battlefield', 'Legend', 'Signature', 'Token']
 const DOMAINS    = ['fury', 'calm', 'mind', 'body', 'chaos', 'order']
 
@@ -37,6 +57,15 @@ const DOMAIN_COLORS: Record<string, string> = {
   body:  '#27ae60',
   chaos: '#4a3060',
   order: '#c8a020',
+}
+
+const DOMAIN_ICONS: Record<string, string> = {
+  fury:  furyIcon,
+  calm:  calmIcon,
+  mind:  mindIcon,
+  body:  bodyIcon,
+  chaos: chaosIcon,
+  order: orderIcon,
 }
 
 const getCardDomains = (extDomain: string | null): string[] => {
@@ -81,7 +110,7 @@ function FilterDropdown({
   onToggle,
 }: {
   label: string
-  options: { value: string; label: string }[]
+  options: { value: string; label: string; icon?: string }[]
   selected: string[]
   onToggle: (value: string) => void
 }) {
@@ -114,6 +143,9 @@ function FilterDropdown({
                 checked={selected.includes(opt.value)}
                 onChange={() => onToggle(opt.value)}
               />
+              {opt.icon && (
+                <img src={opt.icon} alt={opt.label} style={{ width: '22px', height: '22px', objectFit: 'contain' }} />
+              )}
               {opt.label}
             </label>
           ))}
@@ -147,7 +179,9 @@ export default function CatalogPage() {
         return false
       if (filters.domains.length > 0) {
         const cardDomains = getCardDomains(c.ext_domain)
-        if (!filters.domains.some((d) => cardDomains.includes(d))) return false
+        const matchesNone   = filters.domains.includes('none') && cardDomains.length === 0
+        const matchesDomain = filters.domains.some((d) => d !== 'none' && cardDomains.includes(d))
+        if (!matchesNone && !matchesDomain) return false
       }
       if (filters.types.length > 0 && !filters.types.includes(normalizeCardType(c.ext_card_type)))
         return false
@@ -204,7 +238,7 @@ export default function CatalogPage() {
           />
           <FilterDropdown
             label="Rareza"
-            options={RARITIES.map((r) => ({ value: r, label: r }))}
+            options={RARITIES}
             selected={filters.rarities}
             onToggle={(v) => toggleFilter('rarities', v)}
           />
@@ -231,10 +265,22 @@ export default function CatalogPage() {
                   onClick={() => toggleFilter('domains', d)}
                   title={capitalize(d)}
                 >
-                  {d[0].toUpperCase()}
+                  <img src={DOMAIN_ICONS[d]} alt={d} style={{ width: '28px', height: '28px', objectFit: 'contain', display: 'block' }} />
                 </button>
               )
             })}
+            <button
+              className={`domain-circle ${filters.domains.includes('none') ? 'active' : ''}`}
+              style={{
+                borderColor: '#6b7280',
+                background:  filters.domains.includes('none') ? '#6b7280' : 'transparent',
+                color:       filters.domains.includes('none') ? 'white' : '#6b7280',
+              }}
+              onClick={() => toggleFilter('domains', 'none')}
+              title="Sin dominio"
+            >
+              –
+            </button>
           </div>
         </div>
 
