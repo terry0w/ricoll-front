@@ -47,16 +47,16 @@ const RARITIES = [
   { value: 'Showcase',        label: 'Showcase',        icon: showcaseIcon },
   { value: 'Signed Showcase', label: 'Signed Showcase', icon: showcaseIcon },
 ]
-const CARD_TYPES = ['Unit', 'Spell', 'Gear', 'Battlefield', 'Legend', 'Signature', 'Token']
+const CARD_TYPES = ['Unit', 'Spell', 'Gear', 'Battlefield', 'Legend', 'Signature', 'Token', 'Rune']
 const DOMAINS    = ['fury', 'calm', 'mind', 'body', 'chaos', 'order']
 
 const DOMAIN_COLORS: Record<string, string> = {
-  fury:  '#c0392b',
+  fury:  '#e8604c',
   calm:  '#2980b9',
   mind:  '#8e44ad',
   body:  '#27ae60',
   chaos: '#4a3060',
-  order: '#c8a020',
+  order: '#e6c020',
 }
 
 const DOMAIN_ICONS: Record<string, string> = {
@@ -76,9 +76,10 @@ const getCardDomains = (extDomain: string | null): string[] => {
 const normalizeCardType = (extCardType: string | null): string => {
   if (!extCardType) return ''
   const lower = extCardType.toLowerCase()
-  if (lower.includes('token'))       return 'Token'
+  if (lower.includes('token'))       return 'Token'      // Unit;Token / Gear;Token → Token
+  if (lower.includes('rune'))        return 'Rune'
   if (lower.includes('signature'))   return 'Signature'
-  if (lower.includes('unit'))        return 'Unit'
+  if (lower.includes('unit'))        return 'Unit'       // Champion Unit → Unit
   if (lower.includes('gear'))        return 'Gear'
   if (lower.includes('spell'))       return 'Spell'
   if (lower.includes('battlefield')) return 'Battlefield'
@@ -88,6 +89,41 @@ const normalizeCardType = (extCardType: string | null): string => {
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const isFoil = (subTypeName: string | null) => subTypeName === 'Foil'
+
+const DOMAIN_PATTERN = 'fury|calm|mind|body|chaos|order'
+const genericPip = (n: number) =>
+  `<span class="cost-pip cost-pip--generic">${n}</span>`
+const domainPip = (domain: string, icons: Record<string, string>) =>
+  `<img src="${icons[domain.toLowerCase()]}" class="cost-pip cost-pip--domain" alt="${domain}" />`
+const domainPips = (n: number, domain: string, icons: Record<string, string>) =>
+  Array.from({ length: n }, () => domainPip(domain, icons)).join('')
+
+function injectCostIcons(html: string, icons: Record<string, string>): string {
+  let out = html
+
+  // pay N and N Domain → 1 generic circle(N) + N domain pips
+  out = out.replace(
+    new RegExp(`pay (\\d+) and (\\d+) (${DOMAIN_PATTERN})`, 'gi'),
+    (_, n1, n2, d) => `pay ${genericPip(+n1)}${domainPips(+n2, d, icons)}`,
+  )
+  // pay N and Domain → 1 generic circle(N) + 1 domain pip
+  out = out.replace(
+    new RegExp(`pay (\\d+) and (${DOMAIN_PATTERN})`, 'gi'),
+    (_, n, d) => `pay ${genericPip(+n)}${domainPip(d, icons)}`,
+  )
+  // pay N Domain → N domain pips
+  out = out.replace(
+    new RegExp(`pay (\\d+) (${DOMAIN_PATTERN})`, 'gi'),
+    (_, n, d) => `pay ${domainPips(+n, d, icons)}`,
+  )
+  // pay N → 1 generic circle(N)
+  out = out.replace(
+    /pay (\d+)/gi,
+    (_, n) => `pay ${genericPip(+n)}`,
+  )
+
+  return out
+}
 
 // Types that have energy/power/might stats — Tokens, Battlefields, Legends and Runes don't
 const STATS_TYPES = new Set(['Unit', 'Spell', 'Gear', 'Signature'])
@@ -299,7 +335,7 @@ export default function CatalogPage() {
         {pageCards.map((p) => (
           <div
             key={p.product_id}
-            className={`card ${isFoil(p.sub_type_name) ? 'foil' : ''}`}
+            className={`card ${isFoil(p.sub_type_name) ? 'foil' : ''} ${cardType(p.ext_card_type) === 'Battlefield' && p.set_name !== 'origins' ? 'bf-landscape' : ''}`}
             onClick={() => setSelected(p)}
           >
             {p.image_url ? (
@@ -405,14 +441,14 @@ export default function CatalogPage() {
                 {selected.ext_description && (
                   <div
                     className="modal-description"
-                    dangerouslySetInnerHTML={{ __html: selected.ext_description }}
+                    dangerouslySetInnerHTML={{ __html: injectCostIcons(selected.ext_description, DOMAIN_ICONS) }}
                   />
                 )}
 
                 {selected.ext_flavor_text && (
                   <div
                     className="modal-flavor"
-                    dangerouslySetInnerHTML={{ __html: selected.ext_flavor_text }}
+                    dangerouslySetInnerHTML={{ __html: injectCostIcons(selected.ext_flavor_text, DOMAIN_ICONS) }}
                   />
                 )}
 
