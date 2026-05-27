@@ -4,6 +4,8 @@ import './App.css'
 import Navbar from './components/Navbar'
 import { AuthProvider } from './contexts/AuthContext'
 import CatalogPage from './pages/CatalogPage'
+import DeckBuilderPage from './pages/DeckBuilderPage'
+import DeckDetailPage from './pages/DeckDetailPage'
 import DecksPage from './pages/DecksPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import LandingPage from './pages/LandingPage'
@@ -20,6 +22,9 @@ export default function App() {
           <Route path="/"                element={<LandingPage />} />
           <Route path="/catalog"         element={<CatalogPage />} />
           <Route path="/decks"           element={<DecksPage />} />
+          <Route path="/decks/new"        element={<DeckBuilderPage />} />
+          <Route path="/decks/:id/edit"  element={<DeckBuilderPage />} />
+          <Route path="/decks/:id"       element={<DeckDetailPage />} />
           <Route path="/login"           element={<LoginPage />} />
           <Route path="/register"        element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
