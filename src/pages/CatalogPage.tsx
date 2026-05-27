@@ -73,6 +73,19 @@ const getCardDomains = (extDomain: string | null): string[] => {
   return extDomain.split(';').map((d) => d.trim().toLowerCase())
 }
 
+const cardType = (t: string | null): string => {
+  if (!t) return ''
+  const l = t.toLowerCase()
+  if (l.includes('champion')) return 'Champion Unit'
+  if (l.includes('unit'))     return 'Unit'
+  if (l.includes('spell'))    return 'Spell'
+  if (l.includes('gear'))     return 'Gear'
+  if (l.includes('signature'))return 'Signature'
+  if (l.includes('rune'))     return 'Rune'
+  if (l.includes('battle'))   return 'Battlefield'
+  return t
+}
+
 const normalizeCardType = (extCardType: string | null): string => {
   if (!extCardType) return ''
   const lower = extCardType.toLowerCase()
