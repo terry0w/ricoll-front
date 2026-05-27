@@ -12,6 +12,7 @@ export default function Navbar() {
   }
 
   return (
+    <div className="navbar-wrap">
     <nav className="navbar">
       <Link to="/" className="navbar-brand">Ricoll</Link>
 
@@ -35,5 +36,6 @@ export default function Navbar() {
         )}
       </div>
     </nav>
+    </div>
   )
 }
