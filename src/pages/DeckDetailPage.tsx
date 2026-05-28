@@ -71,11 +71,22 @@ interface GameEvent {
 
 type GameOutcome = 'win' | 'loss' | 'draw'
 
-interface DeckResultData {
+interface EventMatch {
+  opponentLegendId: number
+  rounds:           GameOutcome[]
+}
+
+interface DeckEventData {
   id:        string
   gameEvent: GameEvent
-  games:     GameOutcome[]
+  matches:   EventMatch[]
   createdAt: string
+}
+
+interface MatchForm {
+  opponentLegendId: number | null
+  roundCount:       number
+  rounds:           (GameOutcome | null)[]
 }
 
 const DOMAIN_ICONS: Record<string, string> = {
@@ -226,12 +237,13 @@ export default function DeckDetailPage() {
   const [versionsLoading, setVersionsLoading] = useState(false)
 
   // Results
-  const [gameEvents,     setGameEvents]     = useState<GameEvent[]>([])
-  const [results,        setResults]        = useState<DeckResultData[]>([])
-  const [selEventId,     setSelEventId]     = useState<number | null>(null)
-  const [gameCount,      setGameCount]      = useState(3)
-  const [outcomes,       setOutcomes]       = useState<(GameOutcome | null)[]>([null, null, null])
-  const [submitting,     setSubmitting]     = useState(false)
+  const [gameEvents,  setGameEvents]  = useState<GameEvent[]>([])
+  const [events,      setEvents]      = useState<DeckEventData[]>([])
+  const [formOpen,    setFormOpen]    = useState(false)
+  const [selEventId,  setSelEventId]  = useState<number | null>(null)
+  const [matches,     setMatches]     = useState<MatchForm[]>([{ opponentLegendId: null, roundCount: 3, rounds: [null, null, null] }])
+  const [submitting,  setSubmitting]  = useState(false)
+  const [legendSearch, setLegendSearch] = useState('')
 
   useEffect(() => {
     if (!token || !id) return
@@ -239,17 +251,17 @@ export default function DeckDetailPage() {
       fetch(`/api/decks/${id}`,         { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
       fetch('/api/catalog/cards?limit=5000').then((r) => r.json()),
       fetch('/api/decks/game-events/all').then((r) => r.json()),
-      fetch(`/api/decks/${id}/results`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
+      fetch(`/api/decks/${id}/events`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
     ])
-      .then(([deckData, cards, events, res]) => {
+      .then(([deckData, cards, evTypes, evResults]) => {
         if (deckData?.statusCode >= 400) { setError('Deck no encontrado'); return }
         setDeck(deckData)
         setAllCards(cards)
-        if (Array.isArray(events)) {
-          setGameEvents(events)
-          setSelEventId(events[0]?.id ?? null)
+        if (Array.isArray(evTypes)) {
+          setGameEvents(evTypes)
+          setSelEventId(evTypes[0]?.id ?? null)
         }
-        if (Array.isArray(res)) setResults(res)
+        if (Array.isArray(evResults)) setEvents(evResults)
       })
       .catch(() => setError('Error de conexión'))
       .finally(() => setLoading(false))
@@ -284,36 +296,54 @@ export default function DeckDetailPage() {
     setVersionsOpen((o) => !o)
   }
 
-  const handleGameCountChange = (n: number) => {
-    setGameCount(n)
-    setOutcomes((prev) => {
-      const next = [...prev]
-      while (next.length < n) next.push(null)
-      return next.slice(0, n)
-    })
+  const addMatch = () =>
+    setMatches((prev) => [...prev, { opponentLegendId: null, roundCount: 3, rounds: [null, null, null] }])
+
+  const removeMatch = (idx: number) =>
+    setMatches((prev) => prev.filter((_, i) => i !== idx))
+
+  const setMatchLegend = (idx: number, legendId: number) =>
+    setMatches((prev) => prev.map((m, i) => i === idx ? { ...m, opponentLegendId: legendId } : m))
+
+  const setMatchRoundCount = (idx: number, n: number) =>
+    setMatches((prev) => prev.map((m, i) => {
+      if (i !== idx) return m
+      const rounds = [...m.rounds]
+      while (rounds.length < n) rounds.push(null)
+      return { ...m, roundCount: n, rounds: rounds.slice(0, n) }
+    }))
+
+  const setMatchRound = (matchIdx: number, roundIdx: number, val: GameOutcome) =>
+    setMatches((prev) => prev.map((m, i) => {
+      if (i !== matchIdx) return m
+      const rounds = [...m.rounds]
+      rounds[roundIdx] = rounds[roundIdx] === val ? null : val
+      return { ...m, rounds }
+    }))
+
+  const resetForm = () => {
+    setMatches([{ opponentLegendId: null, roundCount: 3, rounds: [null, null, null] }])
+    setLegendSearch('')
+    setFormOpen(false)
   }
 
-  const setOutcome = (idx: number, val: GameOutcome) => {
-    setOutcomes((prev) => {
-      const next = [...prev]
-      next[idx] = next[idx] === val ? null : val
-      return next
-    })
-  }
-
-  const submitResult = async () => {
-    if (!token || !selEventId || outcomes.some((o) => o === null)) return
+  const submitEvent = async () => {
+    if (!token || !selEventId) return
+    if (matches.some((m) => m.opponentLegendId === null || m.rounds.some((r) => r === null))) return
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/decks/${id}/results`, {
+      const res = await fetch(`/api/decks/${id}/events`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ gameEventId: selEventId, games: outcomes }),
+        body: JSON.stringify({
+          gameEventId: selEventId,
+          matches: matches.map((m) => ({ opponentLegendId: m.opponentLegendId, rounds: m.rounds })),
+        }),
       })
       if (res.ok) {
         const saved = await res.json()
-        setResults((prev) => [saved, ...prev])
-        setOutcomes(Array(gameCount).fill(null))
+        setEvents((prev) => [saved, ...prev])
+        resetForm()
         const updatedDeck = await fetch(`/api/decks/${id}`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())
         setDeck(updatedDeck)
       }
@@ -357,7 +387,19 @@ export default function DeckDetailPage() {
     return card ? Array<Card>(quantity).fill(card) : []
   })
 
-  const canSubmit = selEventId !== null && outcomes.every((o) => o !== null)
+  const legendCards = useMemo(() =>
+    allCards.filter((c) => c.ext_card_type?.toLowerCase().includes('legend')),
+  [allCards])
+
+  const filteredLegends = useMemo(() => {
+    if (!legendSearch.trim()) return legendCards
+    const q = legendSearch.toLowerCase()
+    return legendCards.filter((c) => c.name.toLowerCase().includes(q))
+  }, [legendCards, legendSearch])
+
+  const canSubmit = selEventId !== null &&
+    matches.length > 0 &&
+    matches.every((m) => m.opponentLegendId !== null && m.rounds.every((r) => r !== null))
 
   return (
     <div className="dd-page-layout">
@@ -538,82 +580,136 @@ export default function DeckDetailPage() {
 
       {/* ── Panel de resultados ── */}
       <aside className="dd-results-panel">
-        <h3 className="dd-results-title">Resultados</h3>
-
-        {/* Formulario */}
-        <div className="dd-results-form">
-
-          {/* Selector de evento */}
-          <select
-            className="dd-results-select"
-            value={selEventId ?? ''}
-            onChange={(e) => setSelEventId(Number(e.target.value))}
-          >
-            {gameEvents.map((ev) => (
-              <option key={ev.id} value={ev.id}>{ev.name}</option>
-            ))}
-          </select>
-
-          {/* Número de juegos */}
-          <div className="dd-game-count-row">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                className={`dd-game-count-btn${gameCount === n ? ' active' : ''}`}
-                onClick={() => handleGameCountChange(n)}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-
-          {/* Slots de resultado por juego */}
-          <div className="dd-game-slots">
-            {outcomes.map((val, idx) => (
-              <div key={idx} className="dd-game-slot">
-                <span className="dd-game-slot-label">G{idx + 1}</span>
-                {(['win', 'draw', 'loss'] as GameOutcome[]).map((o) => (
-                  <button
-                    key={o}
-                    className={`dd-outcome-btn dd-outcome-${o}${val === o ? ' active' : ''}`}
-                    onClick={() => setOutcome(idx, o)}
-                  >
-                    {OUTCOME_CFG[o].label}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-
-          <button
-            className="btn-accent dd-results-submit"
-            disabled={!canSubmit || submitting}
-            onClick={submitResult}
-          >
-            {submitting ? 'Guardando...' : 'Guardar resultado'}
-          </button>
+        <div className="dd-results-header-row">
+          <h3 className="dd-results-title">Resultados</h3>
+          {!formOpen && (
+            <button className="btn-accent dd-new-event-btn" onClick={() => setFormOpen(true)}>
+              + Nuevo evento
+            </button>
+          )}
         </div>
 
-        {/* Lista de resultados */}
+        {/* Formulario — solo visible al pulsar "Nuevo evento" */}
+        {formOpen && (
+          <div className="dd-results-form">
+
+            {/* Tipo de evento */}
+            <select
+              className="dd-results-select"
+              value={selEventId ?? ''}
+              onChange={(e) => setSelEventId(Number(e.target.value))}
+            >
+              {gameEvents.map((ev) => (
+                <option key={ev.id} value={ev.id}>{ev.name}</option>
+              ))}
+            </select>
+
+            {/* Partidas */}
+            {matches.map((match, mIdx) => (
+              <div key={mIdx} className="dd-match-block">
+                <div className="dd-match-block-header">
+                  <span className="dd-match-label">Partida {mIdx + 1}</span>
+                  {matches.length > 1 && (
+                    <button className="dd-match-remove" onClick={() => removeMatch(mIdx)}>×</button>
+                  )}
+                </div>
+
+                {/* Buscador de leyenda */}
+                <input
+                  className="dd-legend-search"
+                  placeholder="Buscar leyenda oponente..."
+                  value={mIdx === 0 ? legendSearch : ''}
+                  onChange={(e) => setLegendSearch(e.target.value)}
+                />
+                <select
+                  className="dd-results-select"
+                  value={match.opponentLegendId ?? ''}
+                  onChange={(e) => setMatchLegend(mIdx, Number(e.target.value))}
+                >
+                  <option value="">— Selecciona leyenda —</option>
+                  {filteredLegends.map((c) => (
+                    <option key={c.product_id} value={c.product_id}>{c.name}</option>
+                  ))}
+                </select>
+
+                {/* Número de rondas */}
+                <div className="dd-game-count-row">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      className={`dd-game-count-btn${match.roundCount === n ? ' active' : ''}`}
+                      onClick={() => setMatchRoundCount(mIdx, n)}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Resultado por ronda */}
+                <div className="dd-game-slots">
+                  {match.rounds.map((val, rIdx) => (
+                    <div key={rIdx} className="dd-game-slot">
+                      <span className="dd-game-slot-label">R{rIdx + 1}</span>
+                      {(['win', 'draw', 'loss'] as GameOutcome[]).map((o) => (
+                        <button
+                          key={o}
+                          className={`dd-outcome-btn dd-outcome-${o}${val === o ? ' active' : ''}`}
+                          onClick={() => setMatchRound(mIdx, rIdx, o)}
+                        >
+                          {OUTCOME_CFG[o].label}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <button className="dd-add-match-btn" onClick={addMatch}>
+              + Añadir partida
+            </button>
+
+            <div className="dd-form-actions">
+              <button className="btn-outline" onClick={resetForm}>Cancelar</button>
+              <button
+                className="btn-accent dd-results-submit"
+                disabled={!canSubmit || submitting}
+                onClick={submitEvent}
+              >
+                {submitting ? 'Guardando...' : 'Guardar evento'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Lista de eventos completados */}
         <div className="dd-results-list">
-          {results.length === 0 && (
-            <p className="dd-results-empty">Sin resultados registrados.</p>
+          {events.length === 0 && !formOpen && (
+            <p className="dd-results-empty">Sin eventos registrados.</p>
           )}
-          {results.map((r) => (
-            <div key={r.id} className="dd-result-entry">
+          {events.map((ev) => (
+            <div key={ev.id} className="dd-result-entry">
               <div className="dd-result-header">
-                <span className="dd-result-event">{r.gameEvent.name}</span>
+                <span className="dd-result-event">{ev.gameEvent.name}</span>
                 <span className="dd-result-date">
-                  {new Date(r.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                  {new Date(ev.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
                 </span>
               </div>
-              <div className="dd-result-games">
-                {r.games.map((g, i) => (
-                  <span key={i} className={`dd-result-pip dd-result-pip--${g}`}>
-                    {OUTCOME_CFG[g].label}
-                  </span>
-                ))}
-              </div>
+              {ev.matches.map((m, i) => {
+                const opp = cardMap.get(m.opponentLegendId)
+                return (
+                  <div key={i} className="dd-result-match">
+                    <span className="dd-result-opp">{opp ? opp.name : `#${m.opponentLegendId}`}</span>
+                    <div className="dd-result-games">
+                      {m.rounds.map((r, ri) => (
+                        <span key={ri} className={`dd-result-pip dd-result-pip--${r}`}>
+                          {OUTCOME_CFG[r].label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           ))}
         </div>
