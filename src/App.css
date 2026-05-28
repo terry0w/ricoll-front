@@ -1845,11 +1845,216 @@
 
 /* ── Deck Detail Page ─────────────────────────────────────── */
 
-.deck-detail {
-  max-width: 1200px;
+.dd-page-layout {
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 16px 60px;
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
 }
+
+.dd-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Panel de resultados ── */
+.dd-results-panel {
+  width: 300px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 80px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+.dd-results-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dd-results-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dd-results-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.dd-results-select:focus { border-color: var(--accent); }
+
+.dd-game-count-row {
+  display: flex;
+  gap: 6px;
+}
+
+.dd-game-count-btn {
+  flex: 1;
+  padding: 5px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dd-game-count-btn:hover { border-color: var(--accent); color: var(--accent); }
+.dd-game-count-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.dd-game-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dd-game-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dd-game-slot-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  opacity: 0.5;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.dd-outcome-btn {
+  flex: 1;
+  padding: 6px 0;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s;
+  line-height: 1;
+}
+
+.dd-outcome-win  { color: #27ae60; }
+.dd-outcome-draw { color: var(--text); }
+.dd-outcome-loss { color: #e74c3c; }
+
+.dd-outcome-win.active  { background: rgba(39, 174, 96, 0.18);  border-color: #27ae60; }
+.dd-outcome-draw.active { background: var(--accent-bg);          border-color: var(--accent); }
+.dd-outcome-loss.active { background: rgba(231, 76, 60, 0.18);  border-color: #e74c3c; }
+
+.dd-outcome-win:hover  { border-color: #27ae60; background: rgba(39, 174, 96, 0.1); }
+.dd-outcome-draw:hover { border-color: var(--accent); background: var(--accent-bg); }
+.dd-outcome-loss:hover { border-color: #e74c3c; background: rgba(231, 76, 60, 0.1); }
+
+.dd-results-submit {
+  width: 100%;
+  padding: 9px;
+  margin-top: 2px;
+}
+
+.dd-results-submit:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+
+.dd-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.dd-results-empty {
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.5;
+  margin: 0;
+}
+
+.dd-result-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.dd-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.dd-result-event {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.dd-result-date {
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.5;
+  white-space: nowrap;
+}
+
+.dd-result-games {
+  display: flex;
+  gap: 5px;
+}
+
+.dd-result-pip {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.dd-result-pip--win  { background: rgba(39, 174, 96, 0.18);  color: #27ae60; }
+.dd-result-pip--draw { background: var(--accent-bg);          color: var(--accent); }
+.dd-result-pip--loss { background: rgba(231, 76, 60, 0.18);  color: #e74c3c; }
 
 .dd-header {
   display: flex;

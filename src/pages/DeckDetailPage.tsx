@@ -62,6 +62,22 @@ interface DeckData {
   updatedAt:        string
 }
 
+interface GameEvent {
+  id:     number
+  name:   string
+  slug:   string
+  weight: number
+}
+
+type GameOutcome = 'win' | 'loss' | 'draw'
+
+interface DeckResultData {
+  id:        string
+  gameEvent: GameEvent
+  games:     GameOutcome[]
+  createdAt: string
+}
+
 const DOMAIN_ICONS: Record<string, string> = {
   fury: furyIcon, calm: calmIcon, mind: mindIcon,
   body: bodyIcon, chaos: chaosIcon, order: orderIcon,
@@ -188,6 +204,12 @@ function CompactCard({ card, quantity, onClick }: { card: Card; quantity: number
   )
 }
 
+const OUTCOME_CFG: Record<GameOutcome, { label: string; cls: string }> = {
+  win:  { label: '+', cls: 'win'  },
+  draw: { label: '○', cls: 'draw' },
+  loss: { label: '−', cls: 'loss' },
+}
+
 export default function DeckDetailPage() {
   const { id }    = useParams<{ id: string }>()
   const { token } = useAuth()
@@ -203,16 +225,31 @@ export default function DeckDetailPage() {
   const [versionsOpen, setVersionsOpen] = useState(false)
   const [versionsLoading, setVersionsLoading] = useState(false)
 
+  // Results
+  const [gameEvents,     setGameEvents]     = useState<GameEvent[]>([])
+  const [results,        setResults]        = useState<DeckResultData[]>([])
+  const [selEventId,     setSelEventId]     = useState<number | null>(null)
+  const [gameCount,      setGameCount]      = useState(3)
+  const [outcomes,       setOutcomes]       = useState<(GameOutcome | null)[]>([null, null, null])
+  const [submitting,     setSubmitting]     = useState(false)
+
   useEffect(() => {
     if (!token || !id) return
     Promise.all([
-      fetch(`/api/decks/${id}`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
+      fetch(`/api/decks/${id}`,         { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
       fetch('/api/catalog/cards?limit=5000').then((r) => r.json()),
+      fetch('/api/decks/game-events/all').then((r) => r.json()),
+      fetch(`/api/decks/${id}/results`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
     ])
-      .then(([deckData, cards]) => {
+      .then(([deckData, cards, events, res]) => {
         if (deckData?.statusCode >= 400) { setError('Deck no encontrado'); return }
         setDeck(deckData)
         setAllCards(cards)
+        if (Array.isArray(events)) {
+          setGameEvents(events)
+          setSelEventId(events[0]?.id ?? null)
+        }
+        if (Array.isArray(res)) setResults(res)
       })
       .catch(() => setError('Error de conexión'))
       .finally(() => setLoading(false))
@@ -227,10 +264,7 @@ export default function DeckDetailPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ public: !deck.public }),
       })
-      if (res.ok) {
-        const updated = await res.json()
-        setDeck(updated)
-      }
+      if (res.ok) setDeck(await res.json())
     } finally {
       setPublishing(false)
     }
@@ -240,7 +274,7 @@ export default function DeckDetailPage() {
     if (!versionsOpen && versions === null) {
       setVersionsLoading(true)
       try {
-        const res = await fetch(`/api/decks/${id}/versions`, { headers: { Authorization: `Bearer ${token}` } })
+        const res  = await fetch(`/api/decks/${id}/versions`, { headers: { Authorization: `Bearer ${token}` } })
         const data = await res.json()
         setVersions(data.sort((a: DeckVersion, b: DeckVersion) => b.version - a.version))
       } finally {
@@ -248,6 +282,44 @@ export default function DeckDetailPage() {
       }
     }
     setVersionsOpen((o) => !o)
+  }
+
+  const handleGameCountChange = (n: number) => {
+    setGameCount(n)
+    setOutcomes((prev) => {
+      const next = [...prev]
+      while (next.length < n) next.push(null)
+      return next.slice(0, n)
+    })
+  }
+
+  const setOutcome = (idx: number, val: GameOutcome) => {
+    setOutcomes((prev) => {
+      const next = [...prev]
+      next[idx] = next[idx] === val ? null : val
+      return next
+    })
+  }
+
+  const submitResult = async () => {
+    if (!token || !selEventId || outcomes.some((o) => o === null)) return
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/decks/${id}/results`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ gameEventId: selEventId, games: outcomes }),
+      })
+      if (res.ok) {
+        const saved = await res.json()
+        setResults((prev) => [saved, ...prev])
+        setOutcomes(Array(gameCount).fill(null))
+        const updatedDeck = await fetch(`/api/decks/${id}`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())
+        setDeck(updatedDeck)
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const cardMap = useMemo(() => {
@@ -275,7 +347,6 @@ export default function DeckDetailPage() {
     return card ? Array<Card>(quantity).fill(card) : []
   })
 
-  // Champion first
   const mainCards = [
     ...mainCardsRaw.filter((c) => c.product_id === deck.chosenChampionId),
     ...mainCardsRaw.filter((c) => c.product_id !== deck.chosenChampionId),
@@ -286,189 +357,267 @@ export default function DeckDetailPage() {
     return card ? Array<Card>(quantity).fill(card) : []
   })
 
+  const canSubmit = selEventId !== null && outcomes.every((o) => o !== null)
+
   return (
-    <div className="deck-detail">
+    <div className="dd-page-layout">
 
-      {/* ── Header ── */}
-      <div className="dd-header">
-        {legend?.image_url && (
-          <img
-            src={hqUrl(legend.image_url)}
-            alt={legend.name}
-            className="dd-legend-hero"
-            onClick={() => setSelectedCard(legend)}
-            style={{ cursor: 'pointer' }}
-          />
-        )}
-        <div className="dd-header-info">
-          <h1 className="dd-name">{deck.name}</h1>
-          <div className="dd-badges">
-            <span className={`badge ${deck.legal ? 'badge-legal' : 'badge-illegal'}`}>
-              {deck.legal ? 'Legal' : 'Ilegal'}
-            </span>
-            <label className={`dd-publish-toggle ${!deck.legal ? 'dd-publish-disabled' : ''}`}>
-              <input
-                type="checkbox"
-                checked={deck.public}
-                disabled={publishing || !deck.legal}
-                onChange={togglePublic}
-              />
-              Publicar
-            </label>
-          </div>
-          {legend && (
-            <p className="dd-meta-line">
-              <span className="dd-meta-label">Legend</span>
-              {legend.ext_domain && (
-                <span className="dd-meta-domains">
-                  {legend.ext_domain.split(';').map((d) => (
-                    <img key={d} src={DOMAIN_ICONS[d.trim().toLowerCase()]} alt={d} className="domain-pip" />
-                  ))}
-                </span>
-              )}
-              {legend.name}
-            </p>
-          )}
-          {champion && (
-            <p className="dd-meta-line">
-              <span className="dd-meta-label">Chosen</span>
-              {champion.name}
-            </p>
-          )}
-          <div className="dd-stats">
-            <span>{deckTotal}/40 cartas</span>
-            {runeCards.length > 0 && <span>{runeCards.length}/12 runas</span>}
-            {deck.winRate !== null && <span className="dd-winrate">{deck.winRate}% WR</span>}
-            <span className="dd-version">v{deck.currentVersion}</span>
-          </div>
-          <button className="btn-accent dd-edit-btn" onClick={() => navigate(`/decks/${id}/edit`)}>
-            Editar deck
-          </button>
+      {/* ── Columna principal ── */}
+      <div className="dd-main">
 
+        {/* Header */}
+        <div className="dd-header">
+          {legend?.image_url && (
+            <img
+              src={hqUrl(legend.image_url)}
+              alt={legend.name}
+              className="dd-legend-hero"
+              onClick={() => setSelectedCard(legend)}
+              style={{ cursor: 'pointer' }}
+            />
+          )}
+          <div className="dd-header-info">
+            <h1 className="dd-name">{deck.name}</h1>
+            <div className="dd-badges">
+              <span className={`badge ${deck.legal ? 'badge-legal' : 'badge-illegal'}`}>
+                {deck.legal ? 'Legal' : 'Ilegal'}
+              </span>
+              <label className={`dd-publish-toggle ${!deck.legal ? 'dd-publish-disabled' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={deck.public}
+                  disabled={publishing || !deck.legal}
+                  onChange={togglePublic}
+                />
+                Publicar
+              </label>
+            </div>
+            {legend && (
+              <p className="dd-meta-line">
+                <span className="dd-meta-label">Legend</span>
+                {legend.ext_domain && (
+                  <span className="dd-meta-domains">
+                    {legend.ext_domain.split(';').map((d) => (
+                      <img key={d} src={DOMAIN_ICONS[d.trim().toLowerCase()]} alt={d} className="domain-pip" />
+                    ))}
+                  </span>
+                )}
+                {legend.name}
+              </p>
+            )}
+            {champion && (
+              <p className="dd-meta-line">
+                <span className="dd-meta-label">Chosen</span>
+                {champion.name}
+              </p>
+            )}
+            <div className="dd-stats">
+              <span>{deckTotal}/40 cartas</span>
+              {runeCards.length > 0 && <span>{runeCards.length}/12 runas</span>}
+              {deck.winRate !== null && <span className="dd-winrate">{deck.winRate}% WR</span>}
+              <span className="dd-version">v{deck.currentVersion}</span>
+            </div>
+            <button className="btn-accent dd-edit-btn" onClick={() => navigate(`/decks/${id}/edit`)}>
+              Editar deck
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* ── Body ── */}
-      <div className="dd-body">
+        {/* Body */}
+        <div className="dd-body">
 
-        {/* Runas — fila única compacta */}
-        {runeCards.length > 0 && (
-          <div className="dd-type-section">
-            <div className="dd-type-label">
-              Runas <span className="dd-type-count">{runeCards.length}/12</span>
-            </div>
-            <div className="dd-rune-strip">
-              {runeCards.map((card, i) => (
-                <div key={`${card.product_id}-rune-${i}`} className="dd-rune-mini" onClick={() => setSelectedCard(card)}>
-                  {card.image_url
-                    ? <img src={hqUrl(card.image_url)} alt={card.name} draggable={false} />
-                    : <div className="dd-rune-mini-noimg" />
-                  }
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Battlefields — fila completa */}
-        {bfCards.length > 0 && (
-          <div className="dd-type-section">
-            <div className="dd-type-label">
-              Battlefields <span className="dd-type-count">{bfCards.length}/3</span>
-            </div>
-            <div className="dd-bf-full-row">
-              {bfCards.map((c) => (
-                <div key={c.product_id} className={`dd-bf-full-card${c.set_name === 'origins' ? ' origins' : ''}`} onClick={() => setSelectedCard(c)}>
-                  {c.image_url
-                    ? <img src={hqUrl(c.image_url)} alt={c.name} draggable={false} />
-                    : <div className="dd-bf-noimg">{c.name}</div>
-                  }
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Mazo principal */}
-        {mainCards.length > 0 && (
-          <div className="dd-type-section">
-            <div className="dd-type-label">
-              Mazo <span className="dd-type-count">{mainCards.length}/40</span>
-            </div>
-            <div className="dd-card-grid">
-              {mainCards.map((card, i) => (
-                <DdCard key={`${card.product_id}-${i}`} card={card} onClick={() => setSelectedCard(card)} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Sideboard */}
-        {sideCards.length > 0 && (
-          <div className="dd-type-section">
-            <div className="dd-type-label">
-              Sideboard <span className="dd-type-count">{sideCards.length}/8</span>
-            </div>
-            <div className="dd-card-grid">
-              {sideCards.map((card, i) => (
-                <DdCard key={`${card.product_id}-side-${i}`} card={card} onClick={() => setSelectedCard(card)} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Historial de versiones */}
-        <div className="dd-versions">
-          <button className="dd-versions-toggle" onClick={toggleVersions}>
-            <span>Historial de versiones</span>
-            <span className={`dd-versions-chevron ${versionsOpen ? 'open' : ''}`}>▾</span>
-          </button>
-
-          {versionsOpen && (
-            <div className="dd-versions-body">
-              {versionsLoading && <p className="dd-versions-empty">Cargando...</p>}
-              {versions && versions.length === 0 && (
-                <p className="dd-versions-empty">Sin versiones guardadas.</p>
-              )}
-              {versions && versions.map((v) => {
-                const snap = v.snapshot
-                const allEntries = [
-                  ...snap.mainDeck,
-                  ...(Array.isArray(snap.runes) ? snap.runes : []),
-                  ...snap.battlefields.map((bId) => ({ cardId: bId, quantity: 1 })),
-                  ...(snap.sideboard ?? []),
-                ]
-                return (
-                  <div key={v.id} className="dd-version-entry">
-                    <div className="dd-version-header">
-                      <span className="dd-version-num">v{v.version}</span>
-                      {v.note && <span className="dd-version-note">{v.note}</span>}
-                      <span className="dd-version-date">
-                        {new Date(v.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </span>
-                    </div>
-                    <div className="dd-compact-grid">
-                      {allEntries.map(({ cardId, quantity }) => {
-                        const card = cardMap.get(cardId)
-                        if (!card) return null
-                        return (
-                          <CompactCard
-                            key={cardId}
-                            card={card}
-                            quantity={quantity}
-                            onClick={() => setSelectedCard(card)}
-                          />
-                        )
-                      })}
-                    </div>
+          {runeCards.length > 0 && (
+            <div className="dd-type-section">
+              <div className="dd-type-label">
+                Runas <span className="dd-type-count">{runeCards.length}/12</span>
+              </div>
+              <div className="dd-rune-strip">
+                {runeCards.map((card, i) => (
+                  <div key={`${card.product_id}-rune-${i}`} className="dd-rune-mini" onClick={() => setSelectedCard(card)}>
+                    {card.image_url
+                      ? <img src={hqUrl(card.image_url)} alt={card.name} draggable={false} />
+                      : <div className="dd-rune-mini-noimg" />
+                    }
                   </div>
-                )
-              })}
+                ))}
+              </div>
             </div>
           )}
+
+          {bfCards.length > 0 && (
+            <div className="dd-type-section">
+              <div className="dd-type-label">
+                Battlefields <span className="dd-type-count">{bfCards.length}/3</span>
+              </div>
+              <div className="dd-bf-full-row">
+                {bfCards.map((c) => (
+                  <div key={c.product_id} className={`dd-bf-full-card${c.set_name === 'origins' ? ' origins' : ''}`} onClick={() => setSelectedCard(c)}>
+                    {c.image_url
+                      ? <img src={hqUrl(c.image_url)} alt={c.name} draggable={false} />
+                      : <div className="dd-bf-noimg">{c.name}</div>
+                    }
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {mainCards.length > 0 && (
+            <div className="dd-type-section">
+              <div className="dd-type-label">
+                Mazo <span className="dd-type-count">{mainCards.length}/40</span>
+              </div>
+              <div className="dd-card-grid">
+                {mainCards.map((card, i) => (
+                  <DdCard key={`${card.product_id}-${i}`} card={card} onClick={() => setSelectedCard(card)} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {sideCards.length > 0 && (
+            <div className="dd-type-section">
+              <div className="dd-type-label">
+                Sideboard <span className="dd-type-count">{sideCards.length}/8</span>
+              </div>
+              <div className="dd-card-grid">
+                {sideCards.map((card, i) => (
+                  <DdCard key={`${card.product_id}-side-${i}`} card={card} onClick={() => setSelectedCard(card)} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Historial de versiones */}
+          <div className="dd-versions">
+            <button className="dd-versions-toggle" onClick={toggleVersions}>
+              <span>Historial de versiones</span>
+              <span className={`dd-versions-chevron ${versionsOpen ? 'open' : ''}`}>▾</span>
+            </button>
+            {versionsOpen && (
+              <div className="dd-versions-body">
+                {versionsLoading && <p className="dd-versions-empty">Cargando...</p>}
+                {versions && versions.length === 0 && (
+                  <p className="dd-versions-empty">Sin versiones guardadas.</p>
+                )}
+                {versions && versions.map((v) => {
+                  const snap = v.snapshot
+                  const allEntries = [
+                    ...snap.mainDeck,
+                    ...(Array.isArray(snap.runes) ? snap.runes : []),
+                    ...snap.battlefields.map((bId) => ({ cardId: bId, quantity: 1 })),
+                    ...(snap.sideboard ?? []),
+                  ]
+                  return (
+                    <div key={v.id} className="dd-version-entry">
+                      <div className="dd-version-header">
+                        <span className="dd-version-num">v{v.version}</span>
+                        {v.note && <span className="dd-version-note">{v.note}</span>}
+                        <span className="dd-version-date">
+                          {new Date(v.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <div className="dd-compact-grid">
+                        {allEntries.map(({ cardId, quantity }) => {
+                          const card = cardMap.get(cardId)
+                          if (!card) return null
+                          return (
+                            <CompactCard key={cardId} card={card} quantity={quantity} onClick={() => setSelectedCard(card)} />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── Panel de resultados ── */}
+      <aside className="dd-results-panel">
+        <h3 className="dd-results-title">Resultados</h3>
+
+        {/* Formulario */}
+        <div className="dd-results-form">
+
+          {/* Selector de evento */}
+          <select
+            className="dd-results-select"
+            value={selEventId ?? ''}
+            onChange={(e) => setSelEventId(Number(e.target.value))}
+          >
+            {gameEvents.map((ev) => (
+              <option key={ev.id} value={ev.id}>{ev.name}</option>
+            ))}
+          </select>
+
+          {/* Número de juegos */}
+          <div className="dd-game-count-row">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                className={`dd-game-count-btn${gameCount === n ? ' active' : ''}`}
+                onClick={() => handleGameCountChange(n)}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+
+          {/* Slots de resultado por juego */}
+          <div className="dd-game-slots">
+            {outcomes.map((val, idx) => (
+              <div key={idx} className="dd-game-slot">
+                <span className="dd-game-slot-label">G{idx + 1}</span>
+                {(['win', 'draw', 'loss'] as GameOutcome[]).map((o) => (
+                  <button
+                    key={o}
+                    className={`dd-outcome-btn dd-outcome-${o}${val === o ? ' active' : ''}`}
+                    onClick={() => setOutcome(idx, o)}
+                  >
+                    {OUTCOME_CFG[o].label}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          <button
+            className="btn-accent dd-results-submit"
+            disabled={!canSubmit || submitting}
+            onClick={submitResult}
+          >
+            {submitting ? 'Guardando...' : 'Guardar resultado'}
+          </button>
         </div>
 
-      </div>
+        {/* Lista de resultados */}
+        <div className="dd-results-list">
+          {results.length === 0 && (
+            <p className="dd-results-empty">Sin resultados registrados.</p>
+          )}
+          {results.map((r) => (
+            <div key={r.id} className="dd-result-entry">
+              <div className="dd-result-header">
+                <span className="dd-result-event">{r.gameEvent.name}</span>
+                <span className="dd-result-date">
+                  {new Date(r.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                </span>
+              </div>
+              <div className="dd-result-games">
+                {r.games.map((g, i) => (
+                  <span key={i} className={`dd-result-pip dd-result-pip--${g}`}>
+                    {OUTCOME_CFG[g].label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
 
       {selectedCard && <CardModal card={selectedCard} onClose={() => setSelectedCard(null)} />}
     </div>
