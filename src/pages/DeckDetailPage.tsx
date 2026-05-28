@@ -358,6 +358,20 @@ export default function DeckDetailPage() {
     return m
   }, [allCards])
 
+  const legendCards = useMemo(() =>
+    allCards.filter((c) => c.ext_card_type?.toLowerCase().includes('legend')),
+  [allCards])
+
+  const filteredLegends = useMemo(() => {
+    if (!legendSearch.trim()) return legendCards
+    const q = legendSearch.toLowerCase()
+    return legendCards.filter((c) => c.name.toLowerCase().includes(q))
+  }, [legendCards, legendSearch])
+
+  const canSubmit = selEventId !== null &&
+    matches.length > 0 &&
+    matches.every((m) => m.opponentLegendId !== null && m.rounds.every((r) => r !== null))
+
   if (!token) return <div className="empty-page"><p>Inicia sesión para ver tus decks.</p></div>
   if (loading) return <div className="app"><p className="results-count">Cargando...</p></div>
   if (error || !deck) return <div className="app"><p className="results-count">{error || 'Deck no encontrado'}</p></div>
@@ -386,20 +400,6 @@ export default function DeckDetailPage() {
     const card = cardMap.get(cardId)
     return card ? Array<Card>(quantity).fill(card) : []
   })
-
-  const legendCards = useMemo(() =>
-    allCards.filter((c) => c.ext_card_type?.toLowerCase().includes('legend')),
-  [allCards])
-
-  const filteredLegends = useMemo(() => {
-    if (!legendSearch.trim()) return legendCards
-    const q = legendSearch.toLowerCase()
-    return legendCards.filter((c) => c.name.toLowerCase().includes(q))
-  }, [legendCards, legendSearch])
-
-  const canSubmit = selEventId !== null &&
-    matches.length > 0 &&
-    matches.every((m) => m.opponentLegendId !== null && m.rounds.every((r) => r !== null))
 
   return (
     <div className="dd-page-layout">
