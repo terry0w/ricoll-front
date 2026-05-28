@@ -20,8 +20,8 @@ export default function Navbar() {
       <div className="navbar-links">
         <NavLink to="/catalog"       className="nav-link">Catálogo</NavLink>
         <NavLink to="/collection"    className="nav-link">Colección</NavLink>
-        <NavLink to="/decks/explore" className="nav-link">Explorar</NavLink>
-        <NavLink to="/decks"         className="nav-link">Mis decks</NavLink>
+        <NavLink to="/decks/explore" className="nav-link">Listas Publicas</NavLink>
+        <NavLink to="/decks" end      className="nav-link">Mis decks</NavLink>
       </div>
 
       <div className="navbar-actions">

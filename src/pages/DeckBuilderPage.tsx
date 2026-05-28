@@ -117,11 +117,11 @@ export default function DeckBuilderPage() {
   const [dragSource,  setDragSource]  = useState<'browser' | 'deck' | 'side' | null>(null)
   const [isDragOver,  setIsDragOver]  = useState(false)
 
-  const [legend,    setLegend]    = useState<Card | null>(null)
-  const [champion,  setChampion]  = useState<Card | null>(null)
-  const [deck,      setDeck]      = useState<Map<number, DeckEntry>>(new Map())
-  const [runeMap,   setRuneMap]   = useState<Map<number, DeckEntry>>(new Map())
-  const [bfs,       setBfs]       = useState<number[]>([])
+  const [legend,         setLegend]         = useState<Card | null>(null)
+  const [champion,       setChampion]       = useState<Card | null>(null)
+  const [deck,           setDeck]           = useState<Map<number, DeckEntry>>(new Map())
+  const [runeSelections, setRuneSelections] = useState<Map<string, { card: Card; qty: number }>>(new Map())
+  const [bfs,            setBfs]            = useState<number[]>([])
   const [sideboard, setSideboard] = useState<Map<number, DeckEntry>>(new Map())
   const [deckName,     setDeckName]     = useState('')
   const [isPublic,     setIsPublic]     = useState(false)
@@ -171,12 +171,15 @@ export default function DeckBuilderPage() {
 
     setBfs(editDeckRaw.battlefields)
 
-    const runeMapEdit = new Map<number, DeckEntry>()
+    const runeSelectionsLoad = new Map<string, { card: Card; qty: number }>()
     ;(Array.isArray(editDeckRaw.runes) ? editDeckRaw.runes : []).forEach(({ cardId, quantity }) => {
       const card = cMap.get(cardId)
-      if (card) runeMapEdit.set(cardId, { card, qty: quantity })
+      if (!card) return
+      const domain = card.ext_domain?.split(';')[0].trim().toLowerCase() ?? 'unknown'
+      const existing = runeSelectionsLoad.get(domain)
+      runeSelectionsLoad.set(domain, { card, qty: (existing?.qty ?? 0) + quantity })
     })
-    setRuneMap(runeMapEdit)
+    setRuneSelections(runeSelectionsLoad)
 
     const sideMap = new Map<number, DeckEntry>()
     editDeckRaw.sideboard.forEach(({ cardId, quantity }) => {
@@ -243,7 +246,22 @@ export default function DeckBuilderPage() {
 
   const deckTotal  = useMemo(() => mapTotal(deck),      [deck])
   const sideTotal  = useMemo(() => mapTotal(sideboard), [sideboard])
-  const runeTotal  = useMemo(() => mapTotal(runeMap),   [runeMap])
+
+  const runesByDomain = useMemo(() => {
+    const m = new Map<string, Card[]>()
+    runePool.forEach((c) => {
+      const domain = c.ext_domain?.split(';')[0].trim().toLowerCase() ?? 'unknown'
+      if (!m.has(domain)) m.set(domain, [])
+      m.get(domain)!.push(c)
+    })
+    return m
+  }, [runePool])
+
+  const runeTotal = useMemo(() => {
+    let t = 0
+    runeSelections.forEach(({ qty }) => { t += qty })
+    return t
+  }, [runeSelections])
 
   const deckByType = useMemo(() => groupByType(deck,      chName), [deck,      chName])
   const sideByType = useMemo(() => groupByType(sideboard, chName), [sideboard, chName])
@@ -319,14 +337,24 @@ export default function DeckBuilderPage() {
   const toggleBf = (id: number) =>
     setBfs((prev) => prev.includes(id) ? prev.filter((b) => b !== id) : prev.length < 3 ? [...prev, id] : prev)
 
-  const adjustRuneCard = (card: Card, delta: number) => {
-    setRuneMap((prev) => {
-      const next   = new Map(prev)
-      const cur    = next.get(card.product_id)?.qty ?? 0
-      const newQty = cur + delta
-      if (newQty <= 0) { next.delete(card.product_id); return next }
+  const selectRuneSkin = (domain: string, card: Card) => {
+    setRuneSelections((prev) => {
+      const next = new Map(prev)
+      const cur  = next.get(domain)
+      next.set(domain, { card, qty: cur?.qty ?? 0 })
+      return next
+    })
+  }
+
+  const adjustRuneQty = (domain: string, delta: number) => {
+    setRuneSelections((prev) => {
+      const cur = prev.get(domain)
+      if (!cur) return prev
+      const newQty = cur.qty + delta
+      if (newQty < 0) return prev
       if (delta > 0 && runeTotal >= 12) return prev
-      next.set(card.product_id, { card, qty: newQty })
+      const next = new Map(prev)
+      next.set(domain, { ...cur, qty: newQty })
       return next
     })
   }
@@ -337,12 +365,12 @@ export default function DeckBuilderPage() {
     setDeck(new Map())
     setSideboard(new Map())
     setBfs([])
-    setRuneMap(new Map())
+    setRuneSelections(new Map())
     setTab('deck')
   }
 
   const clearLegend = () => {
-    setLegend(null); setChampion(null); setDeck(new Map()); setSideboard(new Map()); setBfs([]); setRuneMap(new Map())
+    setLegend(null); setChampion(null); setDeck(new Map()); setSideboard(new Map()); setBfs([]); setRuneSelections(new Map())
     setTab('legend')
   }
 
@@ -357,7 +385,9 @@ export default function DeckBuilderPage() {
         [...entries].sort((a, b) => a.cardId - b.cardId)
 
       const mainDeckOut  = Array.from(deck.values()).map(({ card, qty }) => ({ cardId: card.product_id, quantity: qty }))
-      const runesOut     = Array.from(runeMap.values()).map(({ card, qty }) => ({ cardId: card.product_id, quantity: qty }))
+      const runesOut     = Array.from(runeSelections.values())
+        .filter(({ qty }) => qty > 0)
+        .map(({ card, qty }) => ({ cardId: card.product_id, quantity: qty }))
       const sideboardOut = Array.from(sideboard.values()).map(({ card, qty }) => ({ cardId: card.product_id, quantity: qty }))
 
       const body = {
@@ -673,28 +703,50 @@ export default function DeckBuilderPage() {
                 Runas
                 <span className={`db-count ${runeTotal === 12 ? 'ok' : ''}`}>{runeTotal}/12</span>
               </div>
-              {runePool.length === 0
-                ? <p className="db-empty">No hay cartas de runa disponibles</p>
-                : (
-                  <div className="db-rune-picker">
-                    {runePool.map((card) => {
-                      const qty = runeMap.get(card.product_id)?.qty ?? 0
-                      return (
-                        <div key={card.product_id} className={`db-rune-item ${qty > 0 ? 'selected' : ''}`}>
-                          {card.image_url
-                            ? <img src={hqUrl(card.image_url)} alt={card.name} className="db-rune-img" onClick={() => setViewCard(card)} />
-                            : <div className="db-rune-img db-rune-noimg" />
-                          }
-                          <div className="db-entry-qty db-rune-qty">
-                            <button onClick={() => adjustRuneCard(card, -1)} disabled={qty <= 0}>−</button>
-                            <span>{qty}</span>
-                            <button onClick={() => adjustRuneCard(card, +1)} disabled={runeTotal >= 12}>+</button>
-                          </div>
+              {domains.length === 0 || runePool.length === 0
+                ? <p className="db-empty">No hay runas disponibles para esta leyenda</p>
+                : domains.map((domain) => {
+                    const skins = runesByDomain.get(domain) ?? []
+                    if (skins.length === 0) return null
+                    const sel = runeSelections.get(domain)
+                    return (
+                      <div key={domain} className="db-rune-domain-group">
+                        <div className="db-rune-domain-header">
+                          {DOMAIN_ICONS[domain] && (
+                            <img src={DOMAIN_ICONS[domain]} alt={domain} className="domain-pip" />
+                          )}
+                          <span className="db-rune-domain-name">
+                            {domain.charAt(0).toUpperCase() + domain.slice(1)}
+                          </span>
+                          {sel && (
+                            <div className="db-entry-qty db-rune-qty">
+                              <button onClick={() => adjustRuneQty(domain, -1)} disabled={!sel || sel.qty <= 0}>−</button>
+                              <span>{sel?.qty ?? 0}</span>
+                              <button onClick={() => adjustRuneQty(domain, +1)} disabled={runeTotal >= 12}>+</button>
+                            </div>
+                          )}
                         </div>
-                      )
-                    })}
-                  </div>
-                )
+                        <div className="db-rune-skin-picker">
+                          {skins.map((card) => (
+                            <div
+                              key={card.product_id}
+                              className={`db-rune-skin${sel?.card?.product_id === card.product_id ? ' selected' : ''}`}
+                              onClick={() => selectRuneSkin(domain, card)}
+                              title={card.name}
+                            >
+                              {card.image_url
+                                ? <img src={hqUrl(card.image_url)} alt={card.name} />
+                                : <div className="db-rune-skin-noimg" />
+                              }
+                              {sel?.card?.product_id === card.product_id && sel.qty > 0 && (
+                                <span className="db-rune-skin-qty">×{sel.qty}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })
               }
             </div>
           )}

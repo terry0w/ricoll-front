@@ -260,6 +260,9 @@ export default function DeckDetailPage() {
   const [submitting,      setSubmitting]      = useState(false)
   const [editingEventId,  setEditingEventId]  = useState<string | null>(null)
 
+  // Shopping list
+  const [collection,   setCollection]   = useState<Map<string, number> | null>(null)
+
   useEffect(() => {
     if (!token || !id) return
     Promise.all([
@@ -281,6 +284,18 @@ export default function DeckDetailPage() {
       .catch(() => setError('Error de conexión'))
       .finally(() => setLoading(false))
   }, [id, token])
+
+  useEffect(() => {
+    if (!token) return
+    fetch('/api/collection', { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((data: { productId: number; subTypeName: string; quantity: number }[]) => {
+        const map = new Map<string, number>()
+        for (const e of data) map.set(`${e.productId}:${e.subTypeName}`, e.quantity)
+        setCollection(map)
+      })
+      .catch(() => {})
+  }, [token])
 
   const togglePublic = async () => {
     if (!deck || !token) return
@@ -397,6 +412,65 @@ export default function DeckDetailPage() {
     return m
   }, [allCards])
 
+  const ownedByProduct = useMemo(() => {
+    if (!collection) return new Map<number, number>()
+    const m = new Map<number, number>()
+    for (const [key, qty] of collection) {
+      const pid = Number(key.split(':')[0])
+      m.set(pid, (m.get(pid) ?? 0) + qty)
+    }
+    return m
+  }, [collection])
+
+  const shoppingEntries = useMemo(() => {
+    if (!deck || collection === null) return []
+    const needed = new Map<number, number>()
+    const allEntries = [
+      ...deck.mainDeck,
+      ...(Array.isArray(deck.runes) ? deck.runes : []),
+      ...deck.battlefields.map((id) => ({ cardId: id, quantity: 1 })),
+      ...(deck.sideboard ?? []),
+    ]
+    for (const e of allEntries) needed.set(e.cardId, (needed.get(e.cardId) ?? 0) + e.quantity)
+    const result: { card: Card; missing: number; lineCost: number }[] = []
+    for (const [cardId, qty] of needed) {
+      const owned   = ownedByProduct.get(cardId) ?? 0
+      const missing = Math.max(0, qty - owned)
+      if (missing === 0) continue
+      const card = cardMap.get(cardId)
+      if (!card) continue
+      const price = Number(card.market_price ?? card.low_price ?? 0)
+      result.push({ card, missing, lineCost: missing * price })
+    }
+    return result.sort((a, b) => b.lineCost - a.lineCost)
+  }, [deck, collection, ownedByProduct, cardMap])
+
+  const ownedEntries = useMemo(() => {
+    if (!deck || collection === null) return []
+    const needed = new Map<number, number>()
+    const allEntries = [
+      ...deck.mainDeck,
+      ...(Array.isArray(deck.runes) ? deck.runes : []),
+      ...deck.battlefields.map((id) => ({ cardId: id, quantity: 1 })),
+      ...(deck.sideboard ?? []),
+    ]
+    for (const e of allEntries) needed.set(e.cardId, (needed.get(e.cardId) ?? 0) + e.quantity)
+    const result: { card: Card; have: number; need: number }[] = []
+    for (const [cardId, qty] of needed) {
+      const owned = ownedByProduct.get(cardId) ?? 0
+      if (owned === 0) continue
+      const card = cardMap.get(cardId)
+      if (!card) continue
+      result.push({ card, have: Math.min(owned, qty), need: qty })
+    }
+    return result.sort((a, b) => baseName(a.card.name).localeCompare(baseName(b.card.name)))
+  }, [deck, collection, ownedByProduct, cardMap])
+
+  const shoppingTotal = useMemo(
+    () => shoppingEntries.reduce((s, r) => s + r.lineCost, 0),
+    [shoppingEntries],
+  )
+
   const legendCards = useMemo(() => {
     const all = allCards.filter((c) => c.ext_card_type?.toLowerCase().includes('legend'))
     const byBase = new Map<string, Card>()
@@ -434,6 +508,10 @@ export default function DeckDetailPage() {
     const card = cardMap.get(cardId)
     return card ? Array<Card>(quantity).fill(card) : []
   })
+
+  const runeEntries = (Array.isArray(deck.runes) ? deck.runes : [])
+    .map(({ cardId, quantity }) => ({ card: cardMap.get(cardId), quantity }))
+    .filter((e): e is { card: Card; quantity: number } => !!e.card)
 
   const mainCardsRaw = deck.mainDeck.flatMap(({ cardId, quantity }) => {
     const card = cardMap.get(cardId)
@@ -520,30 +598,23 @@ export default function DeckDetailPage() {
         {/* Body */}
         <div className="dd-body">
 
-          {runeCards.length > 0 && (
+          {(runeEntries.length > 0 || bfCards.length > 0) && (
             <div className="dd-type-section">
               <div className="dd-type-label">
-                Runas <span className="dd-type-count">{runeCards.length}/12</span>
+                {runeEntries.length > 0 && <>Runas <span className="dd-type-count">{runeCards.length}/12</span></>}
+                {runeEntries.length > 0 && bfCards.length > 0 && <span className="dd-type-label-sep">·</span>}
+                {bfCards.length > 0 && <>Battlefields <span className="dd-type-count">{bfCards.length}/3</span></>}
               </div>
-              <div className="dd-rune-strip">
-                {runeCards.map((card, i) => (
-                  <div key={`${card.product_id}-rune-${i}`} className="dd-rune-mini" onClick={() => setSelectedCard(card)}>
+              <div className="dd-rune-bf-row">
+                {runeEntries.map(({ card, quantity }) => (
+                  <div key={card.product_id} className="dd-rune-unique" onClick={() => setSelectedCard(card)}>
                     {card.image_url
                       ? <img src={hqUrl(card.image_url)} alt={card.name} draggable={false} />
-                      : <div className="dd-rune-mini-noimg" />
+                      : <div className="dd-rune-unique-noimg" />
                     }
+                    <span className="dd-rune-unique-qty">×{quantity}</span>
                   </div>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {bfCards.length > 0 && (
-            <div className="dd-type-section">
-              <div className="dd-type-label">
-                Battlefields <span className="dd-type-count">{bfCards.length}/3</span>
-              </div>
-              <div className="dd-bf-full-row">
                 {bfCards.map((c) => (
                   <div key={c.product_id} className={`dd-bf-full-card${c.set_name === 'origins' ? ' origins' : ''}`} onClick={() => setSelectedCard(c)}>
                     {c.image_url
@@ -581,6 +652,97 @@ export default function DeckDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Resultados de partidas — inline, encima del historial */}
+          <div className="dd-results-section">
+            <div className="dd-results-header">
+              <h3 className="dd-results-title">Resultados de partidas</h3>
+              {!formOpen && (
+                <div className="dd-results-header-add">
+                  <button className="dd-new-event-btn" onClick={() => setFormOpen(true)}>+ Añadir</button>
+                </div>
+              )}
+            </div>
+
+            {formOpen && (
+              <div className="dd-results-form">
+                {editingEventId && <span className="dd-form-edit-label">Editando evento</span>}
+                <select className="dd-results-select" value={selEventId ?? ''} onChange={(e) => setSelEventId(Number(e.target.value))}>
+                  {gameEvents.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                </select>
+                {matches.map((match, mIdx) => (
+                  <div key={mIdx} className="dd-match-block">
+                    <div className="dd-match-block-header">
+                      <span className="dd-match-label">Partida {mIdx + 1}</span>
+                      {matches.length > 1 && <button className="dd-match-remove" onClick={() => removeMatch(mIdx)}>×</button>}
+                    </div>
+                    <input className="dd-legend-search" placeholder="Buscar leyenda oponente..." value={match.legendSearch} onChange={(e) => setMatchLegendSearch(mIdx, e.target.value)} />
+                    <select className="dd-results-select" value={match.opponentLegendId ?? ''} onChange={(e) => setMatchLegend(mIdx, Number(e.target.value))}>
+                      <option value="">— Selecciona leyenda —</option>
+                      {(match.legendSearch.trim() ? legendCards.filter((c) => baseName(c.name).toLowerCase().includes(match.legendSearch.toLowerCase())) : legendCards).map((c) => (
+                        <option key={c.product_id} value={c.product_id}>{baseName(c.name)}</option>
+                      ))}
+                    </select>
+                    <div className="dd-game-count-row">
+                      {[1,2,3,4,5].map((n) => (
+                        <button key={n} className={`dd-game-count-btn${match.roundCount === n ? ' active' : ''}`} onClick={() => setMatchRoundCount(mIdx, n)}>{n}</button>
+                      ))}
+                    </div>
+                    <div className="dd-game-slots">
+                      {match.rounds.map((val, rIdx) => (
+                        <div key={rIdx} className="dd-game-slot">
+                          <span className="dd-game-slot-label">R{rIdx + 1}</span>
+                          {(['win','draw','loss'] as GameOutcome[]).map((o) => (
+                            <button key={o} className={`dd-outcome-btn dd-outcome-${o}${val === o ? ' active' : ''}`} onClick={() => setMatchRound(mIdx, rIdx, o)}>{OUTCOME_CFG[o].label}</button>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <button className="dd-add-match-btn" onClick={addMatch}>+ Añadir partida</button>
+                <div className="dd-form-actions">
+                  <button className="btn-outline" onClick={resetForm}>Cancelar</button>
+                  <button className="btn-accent dd-results-submit" disabled={!canSubmit || submitting} onClick={submitEvent}>
+                    {submitting ? 'Guardando...' : editingEventId ? 'Actualizar evento' : 'Guardar evento'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="dd-results-list">
+              {events.length === 0 && !formOpen && <p className="dd-results-empty">Sin eventos registrados.</p>}
+              {events.map((ev) => {
+                const evRes = eventResult(ev.matches)
+                return (
+                  <div key={ev.id} className={`dd-result-entry dd-result-entry--${evRes}`}>
+                    <div className="dd-result-header">
+                      <span className="dd-result-event">{ev.gameEvent.name}</span>
+                      <div className="dd-result-header-right">
+                        <span className="dd-result-date">{new Date(ev.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</span>
+                        {!formOpen && <button className="dd-result-edit-btn" onClick={() => startEdit(ev)}>✎</button>}
+                      </div>
+                    </div>
+                    <div className="dd-result-matches">
+                      {ev.matches.map((m, i) => {
+                        const opp  = cardMap.get(m.opponentLegendId)
+                        const mRes = matchResult(m.rounds)
+                        return (
+                          <div key={i} className="dd-result-match">
+                            <span className={`dd-result-match-badge dd-result-match-badge--${mRes}`}>{OUTCOME_CFG[mRes].label}</span>
+                            <span className="dd-result-opp">{opp ? baseName(opp.name) : `#${m.opponentLegendId}`}</span>
+                            <div className="dd-result-pips">
+                              {m.rounds.map((r, ri) => <span key={ri} className={`dd-result-pip dd-result-pip--${r}`}>{OUTCOME_CFG[r].label}</span>)}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
 
           {/* Historial de versiones */}
           <div className="dd-versions">
@@ -630,165 +792,47 @@ export default function DeckDetailPage() {
         </div>
       </div>
 
-      {/* ── Panel de resultados ── */}
+      {/* ── Panel de shopping (derecha) ── */}
       <aside className="dd-results-panel">
-        <div className="dd-results-header">
-          <h3 className="dd-results-title">Resultados de partidas</h3>
-          {!formOpen && (
-            <div className="dd-results-header-add">
-              <button className="dd-new-event-btn" onClick={() => setFormOpen(true)}>+ Añadir</button>
-            </div>
+        <div className="pub-ticket">
+          <h3 className="pub-ticket-title">Lo que te falta</h3>
+          {collection === null ? (
+            <p className="pub-missing-hint">Cargando colección...</p>
+          ) : shoppingEntries.length === 0 ? (
+            <p className="pub-missing-complete">✓ Tienes todo</p>
+          ) : (
+            <>
+              <ul className="pub-missing-list">
+                {shoppingEntries.map(({ card, missing, lineCost }) => (
+                  <li key={card.product_id} className="pub-missing-row">
+                    <span className="pub-missing-qty">{missing}×</span>
+                    <span className="pub-missing-name" title={card.name}>{baseName(card.name)}</span>
+                    {lineCost > 0 && <span className="pub-missing-cost">${lineCost.toFixed(2)}</span>}
+                  </li>
+                ))}
+              </ul>
+              <div className="pub-ticket-total">
+                <span>Total estimado</span>
+                <span>${shoppingTotal.toFixed(2)}</span>
+              </div>
+            </>
           )}
         </div>
 
-        {/* Formulario — solo visible al pulsar "Nuevo evento" o editar */}
-        {formOpen && (
-          <div className="dd-results-form">
-            {editingEventId && (
-              <span className="dd-form-edit-label">Editando evento</span>
-            )}
-
-            {/* Tipo de evento */}
-            <select
-              className="dd-results-select"
-              value={selEventId ?? ''}
-              onChange={(e) => setSelEventId(Number(e.target.value))}
-            >
-              {gameEvents.map((ev) => (
-                <option key={ev.id} value={ev.id}>{ev.name}</option>
+        {ownedEntries.length > 0 && (
+          <div className="pub-ticket">
+            <h3 className="pub-ticket-title">Lo que ya tienes</h3>
+            <ul className="pub-missing-list">
+              {ownedEntries.map(({ card, have, need }) => (
+                <li key={card.product_id} className="pub-missing-row">
+                  <span className="pub-missing-qty pub-missing-qty--owned">{have}×</span>
+                  <span className="pub-missing-name" title={card.name}>{baseName(card.name)}</span>
+                  {have < need && <span className="pub-missing-partial">/{need}</span>}
+                </li>
               ))}
-            </select>
-
-            {/* Partidas */}
-            {matches.map((match, mIdx) => (
-              <div key={mIdx} className="dd-match-block">
-                <div className="dd-match-block-header">
-                  <span className="dd-match-label">Partida {mIdx + 1}</span>
-                  {matches.length > 1 && (
-                    <button className="dd-match-remove" onClick={() => removeMatch(mIdx)}>×</button>
-                  )}
-                </div>
-
-                {/* Buscador de leyenda */}
-                <input
-                  className="dd-legend-search"
-                  placeholder="Buscar leyenda oponente..."
-                  value={match.legendSearch}
-                  onChange={(e) => setMatchLegendSearch(mIdx, e.target.value)}
-                />
-                <select
-                  className="dd-results-select"
-                  value={match.opponentLegendId ?? ''}
-                  onChange={(e) => setMatchLegend(mIdx, Number(e.target.value))}
-                >
-                  <option value="">— Selecciona leyenda —</option>
-                  {(match.legendSearch.trim()
-                    ? legendCards.filter((c) =>
-                        baseName(c.name).toLowerCase().includes(match.legendSearch.toLowerCase())
-                      )
-                    : legendCards
-                  ).map((c) => (
-                    <option key={c.product_id} value={c.product_id}>{baseName(c.name)}</option>
-                  ))}
-                </select>
-
-                {/* Número de rondas */}
-                <div className="dd-game-count-row">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      className={`dd-game-count-btn${match.roundCount === n ? ' active' : ''}`}
-                      onClick={() => setMatchRoundCount(mIdx, n)}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Resultado por ronda */}
-                <div className="dd-game-slots">
-                  {match.rounds.map((val, rIdx) => (
-                    <div key={rIdx} className="dd-game-slot">
-                      <span className="dd-game-slot-label">R{rIdx + 1}</span>
-                      {(['win', 'draw', 'loss'] as GameOutcome[]).map((o) => (
-                        <button
-                          key={o}
-                          className={`dd-outcome-btn dd-outcome-${o}${val === o ? ' active' : ''}`}
-                          onClick={() => setMatchRound(mIdx, rIdx, o)}
-                        >
-                          {OUTCOME_CFG[o].label}
-                        </button>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            <button className="dd-add-match-btn" onClick={addMatch}>
-              + Añadir partida
-            </button>
-
-            <div className="dd-form-actions">
-              <button className="btn-outline" onClick={resetForm}>Cancelar</button>
-              <button
-                className="btn-accent dd-results-submit"
-                disabled={!canSubmit || submitting}
-                onClick={submitEvent}
-              >
-                {submitting ? 'Guardando...' : editingEventId ? 'Actualizar evento' : 'Guardar evento'}
-              </button>
-            </div>
+            </ul>
           </div>
         )}
-
-        {/* Lista de eventos completados */}
-        <div className="dd-results-list">
-          {events.length === 0 && !formOpen && (
-            <p className="dd-results-empty">Sin eventos registrados.</p>
-          )}
-          {events.map((ev) => {
-            const evRes = eventResult(ev.matches)
-            return (
-              <div key={ev.id} className={`dd-result-entry dd-result-entry--${evRes}`}>
-                <div className="dd-result-header">
-                  <span className="dd-result-event">{ev.gameEvent.name}</span>
-                  <div className="dd-result-header-right">
-                    <span className="dd-result-date">
-                      {new Date(ev.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-                    </span>
-                    {!formOpen && (
-                      <button className="dd-result-edit-btn" onClick={() => startEdit(ev)}>✎</button>
-                    )}
-                  </div>
-                </div>
-                <div className="dd-result-matches">
-                  {ev.matches.map((m, i) => {
-                    const opp  = cardMap.get(m.opponentLegendId)
-                    const mRes = matchResult(m.rounds)
-                    return (
-                      <div key={i} className="dd-result-match">
-                        <span className={`dd-result-match-badge dd-result-match-badge--${mRes}`}>
-                          {OUTCOME_CFG[mRes].label}
-                        </span>
-                        <span className="dd-result-opp">
-                          {opp ? baseName(opp.name) : `#${m.opponentLegendId}`}
-                        </span>
-                        <div className="dd-result-pips">
-                          {m.rounds.map((r, ri) => (
-                            <span key={ri} className={`dd-result-pip dd-result-pip--${r}`}>
-                              {OUTCOME_CFG[r].label}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
       </aside>
 
       {selectedCard && <CardModal card={selectedCard} onClose={() => setSelectedCard(null)} />}

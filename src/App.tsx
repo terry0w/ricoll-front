@@ -8,6 +8,7 @@ import CollectionPage from './pages/CollectionPage'
 import DeckBuilderPage from './pages/DeckBuilderPage'
 import DeckDetailPage from './pages/DeckDetailPage'
 import DecksPage from './pages/DecksPage'
+import PublicDeckDetailPage from './pages/PublicDeckDetailPage'
 import PublicDecksPage from './pages/PublicDecksPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import LandingPage from './pages/LandingPage'
@@ -25,7 +26,8 @@ export default function App() {
           <Route path="/catalog"           element={<CatalogPage />} />
           <Route path="/collection"        element={<CollectionPage />} />
           <Route path="/decks"             element={<DecksPage />} />
-          <Route path="/decks/explore"    element={<PublicDecksPage />} />
+          <Route path="/decks/explore"      element={<PublicDecksPage />} />
+          <Route path="/decks/public/:id"  element={<PublicDeckDetailPage />} />
           <Route path="/decks/new"        element={<DeckBuilderPage />} />
           <Route path="/decks/:id/edit"   element={<DeckBuilderPage />} />
           <Route path="/decks/:id"        element={<DeckDetailPage />} />

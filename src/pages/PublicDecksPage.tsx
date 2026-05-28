@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 interface PublicDeck {
   id:             string
@@ -20,6 +21,7 @@ const hqUrl   = (url: string) => url.replace('_200w.jpg', '_400w.jpg')
 const baseName = (name: string) => name.replace(/\s*\(.*\)\s*$/, '').trim()
 
 export default function PublicDecksPage() {
+  const navigate = useNavigate()
   const [decks,        setDecks]        = useState<PublicDeck[]>([])
   const [legendData,   setLegendData]   = useState<Record<number, LegendData>>({})
   const [loading,      setLoading]      = useState(true)
@@ -63,7 +65,7 @@ export default function PublicDecksPage() {
   return (
     <div className="app">
       <div className="explore-header">
-        <h2 className="section-title">Explorar decks</h2>
+        <h2 className="section-title">Decks Publicos</h2>
       </div>
 
       <div className="explore-filter-bar">
@@ -93,7 +95,7 @@ export default function PublicDecksPage() {
         {filtered.map((deck) => {
           const legend = legendData[deck.legendId]
           return (
-            <div key={deck.id} className="deck-card">
+            <div key={deck.id} className="deck-card" onClick={() => navigate(`/decks/public/${deck.id}`)}>
               <div className="deck-card-portrait">
                 {legend?.imageUrl
                   ? <img src={legend.imageUrl} alt={legend.name} />
