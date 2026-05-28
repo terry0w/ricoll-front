@@ -1860,13 +1860,11 @@
 
 /* ── Panel de resultados ── */
 .dd-results-panel {
-  width: 320px;
-  flex-shrink: 0;
+  box-sizing: border-box;
   position: sticky;
   top: 0;
   background: var(--code-bg);
   border-left: 1px solid var(--border);
-  border-radius: 0;
   padding: 24px 20px;
   display: flex;
   flex-direction: column;
