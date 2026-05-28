@@ -368,7 +368,10 @@ export default function DeckDetailPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           gameEventId: selEventId,
-          matches: matches.map((m) => ({ opponentLegendId: m.opponentLegendId, rounds: m.rounds })),
+          matches: matches.map((m) => ({
+            opponentLegendId: m.opponentLegendId,
+            rounds: m.rounds.filter((r): r is GameOutcome => r !== null),
+          })),
         }),
       })
       if (res.ok) {
@@ -415,7 +418,7 @@ export default function DeckDetailPage() {
 
   const canSubmit = selEventId !== null &&
     matches.length > 0 &&
-    matches.every((m) => m.opponentLegendId !== null && m.rounds.every((r) => r !== null))
+    matches.every((m) => m.opponentLegendId !== null && m.rounds.some((r) => r !== null))
 
   if (!token) return <div className="empty-page"><p>Inicia sesión para ver tus decks.</p></div>
   if (loading) return <div className="app"><p className="results-count">Cargando...</p></div>

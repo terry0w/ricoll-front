@@ -1846,17 +1846,16 @@
 /* ── Deck Detail Page ─────────────────────────────────────── */
 
 .dd-page-layout {
-  padding: 0 0 60px 24px;
-  display: flex;
-  gap: 0;
-  align-items: flex-start;
+  padding: 0 0 0 24px;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  align-items: start;
+  min-height: 100vh;
 }
 
 .dd-main {
-  flex: 1;
   min-width: 0;
-  max-width: 1100px;
-  padding-right: 28px;
+  padding: 0 28px 60px 0;
 }
 
 /* ── Panel de resultados ── */
