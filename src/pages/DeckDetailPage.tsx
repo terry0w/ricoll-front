@@ -222,6 +222,19 @@ const OUTCOME_CFG: Record<GameOutcome, { label: string; cls: string }> = {
   loss: { label: '−', cls: 'loss' },
 }
 
+function matchResult(rounds: GameOutcome[]): GameOutcome {
+  const w = rounds.filter((r) => r === 'win').length
+  const l = rounds.filter((r) => r === 'loss').length
+  return w > l ? 'win' : l > w ? 'loss' : 'draw'
+}
+
+function eventResult(matches: EventMatch[]): GameOutcome {
+  const results = matches.map((m) => matchResult(m.rounds))
+  const w = results.filter((r) => r === 'win').length
+  const l = results.filter((r) => r === 'loss').length
+  return w > l ? 'win' : l > w ? 'loss' : 'draw'
+}
+
 export default function DeckDetailPage() {
   const { id }    = useParams<{ id: string }>()
   const { token } = useAuth()
@@ -592,12 +605,12 @@ export default function DeckDetailPage() {
 
       {/* ── Panel de resultados ── */}
       <aside className="dd-results-panel">
-        <div className="dd-results-header-row">
-          <h3 className="dd-results-title">Resultados</h3>
+        <div className="dd-results-header">
+          <h3 className="dd-results-title">Resultados de partidas</h3>
           {!formOpen && (
-            <button className="btn-accent dd-new-event-btn" onClick={() => setFormOpen(true)}>
-              + Nuevo evento
-            </button>
+            <div className="dd-results-header-add">
+              <button className="dd-new-event-btn" onClick={() => setFormOpen(true)}>+ Añadir</button>
+            </div>
           )}
         </div>
 
@@ -704,31 +717,42 @@ export default function DeckDetailPage() {
           {events.length === 0 && !formOpen && (
             <p className="dd-results-empty">Sin eventos registrados.</p>
           )}
-          {events.map((ev) => (
-            <div key={ev.id} className="dd-result-entry">
-              <div className="dd-result-header">
-                <span className="dd-result-event">{ev.gameEvent.name}</span>
-                <span className="dd-result-date">
-                  {new Date(ev.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-                </span>
-              </div>
-              {ev.matches.map((m, i) => {
-                const opp = cardMap.get(m.opponentLegendId)
-                return (
-                  <div key={i} className="dd-result-match">
-                    <span className="dd-result-opp">{opp ? opp.name : `#${m.opponentLegendId}`}</span>
-                    <div className="dd-result-games">
-                      {m.rounds.map((r, ri) => (
-                        <span key={ri} className={`dd-result-pip dd-result-pip--${r}`}>
-                          {OUTCOME_CFG[r].label}
+          {events.map((ev) => {
+            const evRes = eventResult(ev.matches)
+            return (
+              <div key={ev.id} className={`dd-result-entry dd-result-entry--${evRes}`}>
+                <div className="dd-result-header">
+                  <span className="dd-result-event">{ev.gameEvent.name}</span>
+                  <span className="dd-result-date">
+                    {new Date(ev.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                  </span>
+                </div>
+                <div className="dd-result-matches">
+                  {ev.matches.map((m, i) => {
+                    const opp  = cardMap.get(m.opponentLegendId)
+                    const mRes = matchResult(m.rounds)
+                    return (
+                      <div key={i} className="dd-result-match">
+                        <span className={`dd-result-match-badge dd-result-match-badge--${mRes}`}>
+                          {OUTCOME_CFG[mRes].label}
                         </span>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ))}
+                        <span className="dd-result-opp">
+                          {opp ? baseName(opp.name) : `#${m.opponentLegendId}`}
+                        </span>
+                        <div className="dd-result-pips">
+                          {m.rounds.map((r, ri) => (
+                            <span key={ri} className={`dd-result-pip dd-result-pip--${r}`}>
+                              {OUTCOME_CFG[r].label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </aside>
 
