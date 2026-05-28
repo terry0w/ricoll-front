@@ -2766,3 +2766,73 @@
   animation: foilShimmer 15s ease-in-out infinite;
   pointer-events: none;
 }
+
+/* ── Colección ── */
+.coll-card-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.card:hover .coll-card-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.coll-owned-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--accent);
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  border-radius: 999px;
+  min-width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  z-index: 1;
+}
+
+.coll-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s, opacity 0.1s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+.coll-btn--add {
+  background: var(--accent);
+  color: white;
+}
+
+.coll-btn--sub {
+  background: rgba(231, 76, 60, 0.9);
+  color: white;
+}
+
+.coll-btn:hover { transform: scale(1.1); }

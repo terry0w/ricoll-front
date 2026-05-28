@@ -4,6 +4,7 @@ import './App.css'
 import Navbar from './components/Navbar'
 import { AuthProvider } from './contexts/AuthContext'
 import CatalogPage from './pages/CatalogPage'
+import CollectionPage from './pages/CollectionPage'
 import DeckBuilderPage from './pages/DeckBuilderPage'
 import DeckDetailPage from './pages/DeckDetailPage'
 import DecksPage from './pages/DecksPage'
@@ -20,7 +21,8 @@ export default function App() {
         <Navbar />
         <Routes>
           <Route path="/"                element={<LandingPage />} />
-          <Route path="/catalog"         element={<CatalogPage />} />
+          <Route path="/catalog"           element={<CatalogPage />} />
+          <Route path="/collection"        element={<CollectionPage />} />
           <Route path="/decks"           element={<DecksPage />} />
           <Route path="/decks/new"        element={<DeckBuilderPage />} />
           <Route path="/decks/:id/edit"  element={<DeckBuilderPage />} />

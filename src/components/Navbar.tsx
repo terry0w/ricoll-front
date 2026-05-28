@@ -18,8 +18,9 @@ export default function Navbar() {
 
       {/* NavLink automatically adds the "active" class when on that route */}
       <div className="navbar-links">
-        <NavLink to="/catalog" className="nav-link">Catálogo</NavLink>
-        <NavLink to="/decks"   className="nav-link">Decks</NavLink>
+        <NavLink to="/catalog"    className="nav-link">Catálogo</NavLink>
+        <NavLink to="/collection" className="nav-link">Colección</NavLink>
+        <NavLink to="/decks"      className="nav-link">Decks</NavLink>
       </div>
 
       <div className="navbar-actions">
