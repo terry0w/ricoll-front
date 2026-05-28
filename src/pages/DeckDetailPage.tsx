@@ -60,6 +60,7 @@ interface DeckData {
   battlefields:     number[]
   sideboard:        DeckCardEntry[]
   updatedAt:        string
+  authorNickname:   string
 }
 
 interface GameEvent {
@@ -468,6 +469,9 @@ export default function DeckDetailPage() {
           )}
           <div className="dd-header-info">
             <h1 className="dd-name">{deck.name}</h1>
+            {deck.authorNickname && (
+              <p className="dd-author">por {deck.authorNickname}</p>
+            )}
             <div className="dd-badges">
               <span className={`badge ${deck.legal ? 'badge-legal' : 'badge-illegal'}`}>
                 {deck.legal ? 'Legal' : 'Ilegal'}

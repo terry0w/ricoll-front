@@ -973,6 +973,46 @@
   opacity: 1;
 }
 
+.deck-author {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.deck-legend-name {
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.7;
+  margin: 0;
+}
+
+.deck-cost {
+  font-size: 11px;
+  font-weight: 600;
+  color: #27ae60;
+}
+
+/* ── Explore page ─────────────────────────────────────────────────────────── */
+
+.explore-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.explore-filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.explore-filter-bar .search {
+  flex: 1;
+  min-width: 200px;
+}
+
 /* Generic badges (used in DeckDetailPage etc.) */
 .badge {
   font-size: 11px;
@@ -2403,6 +2443,12 @@
   line-height: 1.2;
 }
 
+.dd-author {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
 .dd-badges { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 .dd-publish-toggle {
@@ -2836,3 +2882,116 @@
 }
 
 .coll-btn:hover { transform: scale(1.1); }
+
+/* ── Collection modal ──────────────────────────────────────────────────────── */
+
+.coll-modal {
+  max-width: 420px;
+  overflow-y: auto;
+  padding: 28px 24px 24px;
+}
+
+.coll-modal-loading {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 12px 0;
+}
+
+.coll-variant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.coll-variant-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.coll-variant-row:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.coll-variant-name {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.coll-variant-owned {
+  font-size: 0.8rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.coll-qty-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 8px;
+}
+
+.coll-qty-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  flex: 1;
+}
+
+.coll-qty-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.coll-qty-btn:hover:not(:disabled) { background: var(--hover); }
+.coll-qty-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.coll-qty-input {
+  width: 56px;
+  text-align: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 1rem;
+  padding: 4px 8px;
+}
+
+.coll-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.coll-subtract-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.coll-subtract-qty {
+  font-size: 1rem;
+  font-weight: 600;
+  min-width: 28px;
+  text-align: center;
+}
