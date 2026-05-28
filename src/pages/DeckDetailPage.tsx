@@ -87,6 +87,7 @@ interface MatchForm {
   opponentLegendId: number | null
   roundCount:       number
   rounds:           (GameOutcome | null)[]
+  legendSearch:     string
 }
 
 const DOMAIN_ICONS: Record<string, string> = {
@@ -241,9 +242,8 @@ export default function DeckDetailPage() {
   const [events,      setEvents]      = useState<DeckEventData[]>([])
   const [formOpen,    setFormOpen]    = useState(false)
   const [selEventId,  setSelEventId]  = useState<number | null>(null)
-  const [matches,     setMatches]     = useState<MatchForm[]>([{ opponentLegendId: null, roundCount: 3, rounds: [null, null, null] }])
-  const [submitting,  setSubmitting]  = useState(false)
-  const [legendSearch, setLegendSearch] = useState('')
+  const [matches,    setMatches]    = useState<MatchForm[]>([{ opponentLegendId: null, roundCount: 3, rounds: [null, null, null], legendSearch: '' }])
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (!token || !id) return
@@ -297,13 +297,16 @@ export default function DeckDetailPage() {
   }
 
   const addMatch = () =>
-    setMatches((prev) => [...prev, { opponentLegendId: null, roundCount: 3, rounds: [null, null, null] }])
+    setMatches((prev) => [...prev, { opponentLegendId: null, roundCount: 3, rounds: [null, null, null], legendSearch: '' }])
 
   const removeMatch = (idx: number) =>
     setMatches((prev) => prev.filter((_, i) => i !== idx))
 
   const setMatchLegend = (idx: number, legendId: number) =>
     setMatches((prev) => prev.map((m, i) => i === idx ? { ...m, opponentLegendId: legendId } : m))
+
+  const setMatchLegendSearch = (idx: number, val: string) =>
+    setMatches((prev) => prev.map((m, i) => i === idx ? { ...m, legendSearch: val } : m))
 
   const setMatchRoundCount = (idx: number, n: number) =>
     setMatches((prev) => prev.map((m, i) => {
@@ -322,8 +325,7 @@ export default function DeckDetailPage() {
     }))
 
   const resetForm = () => {
-    setMatches([{ opponentLegendId: null, roundCount: 3, rounds: [null, null, null] }])
-    setLegendSearch('')
+    setMatches([{ opponentLegendId: null, roundCount: 3, rounds: [null, null, null], legendSearch: '' }])
     setFormOpen(false)
   }
 
@@ -358,15 +360,25 @@ export default function DeckDetailPage() {
     return m
   }, [allCards])
 
-  const legendCards = useMemo(() =>
-    allCards.filter((c) => c.ext_card_type?.toLowerCase().includes('legend')),
-  [allCards])
-
-  const filteredLegends = useMemo(() => {
-    if (!legendSearch.trim()) return legendCards
-    const q = legendSearch.toLowerCase()
-    return legendCards.filter((c) => c.name.toLowerCase().includes(q))
-  }, [legendCards, legendSearch])
+  const legendCards = useMemo(() => {
+    const all = allCards.filter((c) => c.ext_card_type?.toLowerCase().includes('legend'))
+    const byBase = new Map<string, Card>()
+    for (const c of all) {
+      const base = baseName(c.name)
+      const existing = byBase.get(base)
+      if (!existing) {
+        byBase.set(base, c)
+      } else if (
+        existing.ext_rarity?.toLowerCase() !== 'rare' &&
+        c.ext_rarity?.toLowerCase() === 'rare'
+      ) {
+        byBase.set(base, c)
+      }
+    }
+    return Array.from(byBase.values()).sort((a, b) =>
+      baseName(a.name).localeCompare(baseName(b.name))
+    )
+  }, [allCards])
 
   const canSubmit = selEventId !== null &&
     matches.length > 0 &&
@@ -618,8 +630,8 @@ export default function DeckDetailPage() {
                 <input
                   className="dd-legend-search"
                   placeholder="Buscar leyenda oponente..."
-                  value={mIdx === 0 ? legendSearch : ''}
-                  onChange={(e) => setLegendSearch(e.target.value)}
+                  value={match.legendSearch}
+                  onChange={(e) => setMatchLegendSearch(mIdx, e.target.value)}
                 />
                 <select
                   className="dd-results-select"
@@ -627,8 +639,13 @@ export default function DeckDetailPage() {
                   onChange={(e) => setMatchLegend(mIdx, Number(e.target.value))}
                 >
                   <option value="">— Selecciona leyenda —</option>
-                  {filteredLegends.map((c) => (
-                    <option key={c.product_id} value={c.product_id}>{c.name}</option>
+                  {(match.legendSearch.trim()
+                    ? legendCards.filter((c) =>
+                        baseName(c.name).toLowerCase().includes(match.legendSearch.toLowerCase())
+                      )
+                    : legendCards
+                  ).map((c) => (
+                    <option key={c.product_id} value={c.product_id}>{baseName(c.name)}</option>
                   ))}
                 </select>
 
