@@ -1846,17 +1846,17 @@
 /* ── Deck Detail Page ─────────────────────────────────────── */
 
 .dd-page-layout {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 16px 60px;
+  padding: 0 0 60px 24px;
   display: flex;
-  gap: 28px;
+  gap: 0;
   align-items: flex-start;
 }
 
 .dd-main {
   flex: 1;
   min-width: 0;
+  max-width: 1100px;
+  padding-right: 28px;
 }
 
 /* ── Panel de resultados ── */
@@ -1864,15 +1864,15 @@
   width: 320px;
   flex-shrink: 0;
   position: sticky;
-  top: 80px;
+  top: 0;
   background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 20px 16px;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  height: calc(100vh - 110px);
+  height: 100vh;
   overflow-y: auto;
 }
 
@@ -1915,6 +1915,18 @@
 .dd-new-event-btn:hover {
   background: var(--accent);
   color: white;
+}
+
+.dd-form-edit-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  align-self: flex-start;
 }
 
 .dd-results-form {
@@ -2132,8 +2144,15 @@
 .dd-result-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.dd-result-header-right {
+  display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .dd-result-event {
@@ -2148,6 +2167,20 @@
   opacity: 0.45;
   white-space: nowrap;
 }
+
+.dd-result-edit-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.35;
+  cursor: pointer;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+
+.dd-result-edit-btn:hover { opacity: 0.9; color: var(--accent); }
 
 .dd-result-matches {
   display: flex;

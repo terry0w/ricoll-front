@@ -255,8 +255,9 @@ export default function DeckDetailPage() {
   const [events,      setEvents]      = useState<DeckEventData[]>([])
   const [formOpen,    setFormOpen]    = useState(false)
   const [selEventId,  setSelEventId]  = useState<number | null>(null)
-  const [matches,    setMatches]    = useState<MatchForm[]>([{ opponentLegendId: null, roundCount: 3, rounds: [null, null, null], legendSearch: '' }])
-  const [submitting, setSubmitting] = useState(false)
+  const [matches,         setMatches]         = useState<MatchForm[]>([{ opponentLegendId: null, roundCount: 3, rounds: [null, null, null], legendSearch: '' }])
+  const [submitting,      setSubmitting]      = useState(false)
+  const [editingEventId,  setEditingEventId]  = useState<string | null>(null)
 
   useEffect(() => {
     if (!token || !id) return
@@ -339,7 +340,20 @@ export default function DeckDetailPage() {
 
   const resetForm = () => {
     setMatches([{ opponentLegendId: null, roundCount: 3, rounds: [null, null, null], legendSearch: '' }])
+    setEditingEventId(null)
     setFormOpen(false)
+  }
+
+  const startEdit = (ev: DeckEventData) => {
+    setSelEventId(ev.gameEvent.id)
+    setMatches(ev.matches.map((m) => ({
+      opponentLegendId: m.opponentLegendId,
+      roundCount:       m.rounds.length,
+      rounds:           [...m.rounds] as (GameOutcome | null)[],
+      legendSearch:     '',
+    })))
+    setEditingEventId(ev.id)
+    setFormOpen(true)
   }
 
   const submitEvent = async () => {
@@ -347,8 +361,10 @@ export default function DeckDetailPage() {
     if (matches.some((m) => m.opponentLegendId === null || m.rounds.some((r) => r === null))) return
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/decks/${id}/events`, {
-        method:  'POST',
+      const url    = editingEventId ? `/api/decks/${id}/events/${editingEventId}` : `/api/decks/${id}/events`
+      const method = editingEventId ? 'PATCH' : 'POST'
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           gameEventId: selEventId,
@@ -357,7 +373,11 @@ export default function DeckDetailPage() {
       })
       if (res.ok) {
         const saved = await res.json()
-        setEvents((prev) => [saved, ...prev])
+        if (editingEventId) {
+          setEvents((prev) => prev.map((e) => e.id === editingEventId ? saved : e))
+        } else {
+          setEvents((prev) => [saved, ...prev])
+        }
         resetForm()
         const updatedDeck = await fetch(`/api/decks/${id}`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())
         setDeck(updatedDeck)
@@ -614,9 +634,12 @@ export default function DeckDetailPage() {
           )}
         </div>
 
-        {/* Formulario — solo visible al pulsar "Nuevo evento" */}
+        {/* Formulario — solo visible al pulsar "Nuevo evento" o editar */}
         {formOpen && (
           <div className="dd-results-form">
+            {editingEventId && (
+              <span className="dd-form-edit-label">Editando evento</span>
+            )}
 
             {/* Tipo de evento */}
             <select
@@ -706,7 +729,7 @@ export default function DeckDetailPage() {
                 disabled={!canSubmit || submitting}
                 onClick={submitEvent}
               >
-                {submitting ? 'Guardando...' : 'Guardar evento'}
+                {submitting ? 'Guardando...' : editingEventId ? 'Actualizar evento' : 'Guardar evento'}
               </button>
             </div>
           </div>
@@ -723,9 +746,14 @@ export default function DeckDetailPage() {
               <div key={ev.id} className={`dd-result-entry dd-result-entry--${evRes}`}>
                 <div className="dd-result-header">
                   <span className="dd-result-event">{ev.gameEvent.name}</span>
-                  <span className="dd-result-date">
-                    {new Date(ev.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-                  </span>
+                  <div className="dd-result-header-right">
+                    <span className="dd-result-date">
+                      {new Date(ev.createdAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                    </span>
+                    {!formOpen && (
+                      <button className="dd-result-edit-btn" onClick={() => startEdit(ev)}>✎</button>
+                    )}
+                  </div>
                 </div>
                 <div className="dd-result-matches">
                   {ev.matches.map((m, i) => {
