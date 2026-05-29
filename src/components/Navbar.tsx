@@ -22,6 +22,7 @@ export default function Navbar() {
         <NavLink to="/collection"    className="nav-link">Colección</NavLink>
         <NavLink to="/decks/explore" className="nav-link">Listas Publicas</NavLink>
         <NavLink to="/decks" end      className="nav-link">Mis decks</NavLink>
+        <NavLink to="/proxy"          className="nav-link">Proxys</NavLink>
       </div>
 
       <div className="navbar-actions">

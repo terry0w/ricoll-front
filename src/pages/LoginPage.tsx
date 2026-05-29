@@ -73,6 +73,12 @@ export default function LoginPage() {
       <p className="form-link">
         <Link to="/forgot-password">¿Olvidaste tu contraseña?</Link>
       </p>
+      <div className="form-divider">
+        <span>o</span>
+      </div>
+      <a className="btn-google" href="/api/auth/google">
+        Entrar con Google
+      </a>
       <p className="form-link">
         ¿No tienes cuenta? <Link to="/register">Regístrate</Link>
       </p>

@@ -11,6 +11,8 @@ import DecksPage from './pages/DecksPage'
 import PublicDeckDetailPage from './pages/PublicDeckDetailPage'
 import PublicDecksPage from './pages/PublicDecksPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import GoogleCallbackPage from './pages/GoogleCallbackPage'
+import ProxyPage from './pages/ProxyPage'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -35,6 +37,8 @@ export default function App() {
           <Route path="/register"        element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password"  element={<ResetPasswordPage />} />
+          <Route path="/auth/callback"   element={<GoogleCallbackPage />} />
+          <Route path="/proxy"           element={<ProxyPage />} />
         </Routes>
       </AuthProvider>
     </Router>
