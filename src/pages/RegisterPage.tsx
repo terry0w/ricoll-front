@@ -114,6 +114,12 @@ export default function RegisterPage() {
           {loading ? 'Creando cuenta...' : 'Crear cuenta'}
         </button>
       </form>
+      <div className="form-divider">
+        <span>o</span>
+      </div>
+      <a className="btn-google" href="/api/auth/google">
+        Registrarse con Google
+      </a>
       <p className="form-link">
         ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
       </p>
