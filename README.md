@@ -6,6 +6,7 @@ Web client for **Ricoll**, an app for managing your collection and building deck
 
 > Backend (NestJS API): [terry0w/ricoll-back](https://github.com/terry0w/ricoll-back)
 
+[![CI](https://github.com/terry0w/ricoll-front/actions/workflows/ci.yml/badge.svg)](https://github.com/terry0w/ricoll-front/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![React](https://img.shields.io/badge/React_19-61DAFB?logo=react&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
